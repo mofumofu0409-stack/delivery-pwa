@@ -134,3 +134,11 @@ textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid va
   line-height: 1;
 }
 @media (display-mode: standalone) { .install-hint { display: none !important; } }
+
+/* Customer registration */
+.customer-add { width:100%; margin:0 0 12px; }
+.customer-form label { display:block; font-weight:800; margin:14px 0 6px; }
+.customer-form label:first-child { margin-top:0; }
+.customer-form input { width:100%; min-height:48px; border:1px solid var(--line); border-radius:12px; padding:11px; font-size:16px; background:#fff; color:var(--text); }
+.customer-form textarea { margin-top:0; font-size:16px; color:var(--text); }
+.customer-form input:focus, .customer-form textarea:focus { outline:2px solid var(--primary); outline-offset:2px; }

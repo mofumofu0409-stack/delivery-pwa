@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.2.1';
+const CACHE = CACHE_PREFIX + 'v0.2.2';
 const ASSETS = [
   './',
   './index.html',
@@ -30,14 +30,14 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
+    caches.open(CACHE).then(cache => cache.match(event.request)).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
         if (!response || response.status !== 200 || response.type !== 'basic') return response;
         const copy = response.clone();
         caches.open(CACHE).then(cache => cache.put(event.request, copy));
         return response;
-      }).catch(() => caches.match('./index.html'));
+      }).catch(() => caches.open(CACHE).then(cache => cache.match('./index.html')));
     })
   );
 });

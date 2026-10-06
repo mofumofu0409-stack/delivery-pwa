@@ -15,6 +15,7 @@ const demoCustomers = [
 
 let state = loadState();
 let currentScreen = 'list';
+let editingCustomerId = null;
 let currentCustomerId = state.customers.find(c => c.status === 'pending')?.id || state.customers[0]?.id;
 
 function clone(v){ return JSON.parse(JSON.stringify(v)); }
@@ -51,19 +52,20 @@ function setScreen(screen){
 function render(){
   const counts = getCounts();
   document.getElementById('topCount').textContent = `残り ${counts.pending}件`;
-  const title = currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
+  const title = currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
   document.getElementById('screenTitle').textContent = title;
 
   const main = document.getElementById('main');
   if (currentScreen === 'list') main.innerHTML = renderList();
   if (currentScreen === 'delivery') main.innerHTML = renderDelivery();
   if (currentScreen === 'check') main.innerHTML = renderCheck();
+  if (currentScreen === 'customer') main.innerHTML = renderCustomerForm();
   wireEvents();
 }
 
 function renderList(){
   const counts = getCounts();
-  const groups = {};
+  const groups = Object.create(null);
   state.customers.forEach(c => { (groups[c.area] ||= []).push(c); });
   const listHtml = Object.entries(groups).map(([area, customers]) => `
     <div class="section-title">${escapeHtml(area)}</div>
@@ -91,6 +93,7 @@ function renderList(){
         <div class="metric"><span class="num">${counts.absent}</span><span class="label">不在</span></div>
       </div>
     </section>
+    <button class="action-btn action-secondary customer-add" data-add-customer>＋ 顧客を登録</button>
     ${listHtml}
   `;
 }
@@ -107,6 +110,7 @@ function renderDelivery(){
       <div class="detail-area">${escapeHtml(c.area)}地区</div>
       <div class="detail-name">${escapeHtml(c.name)}さん</div>
       <div class="address">${escapeHtml(c.address)}</div>
+      <button class="link-btn" data-edit-customer>顧客名・住所を編集</button>
       <div class="big-number">配達 ${sumItems(c.items)}品</div>
       ${c.memo ? `<div class="warning-box" style="margin-top:12px">注意：${escapeHtml(c.memo)}</div>` : ''}
     </section>
@@ -178,7 +182,7 @@ function renderCheck(){
 
     <button class="action-btn action-primary" style="width:100%; margin-top:12px" data-finish-day ${ready ? '' : 'disabled'}>本日の配達を終了</button>
     <button class="reset-btn" data-reset>デモデータを初期化</button>
-    <div class="small" style="margin-top:8px">※ v0.1は架空データのみ。入力内容はこの端末のブラウザ内に保存されます。</div>
+    <div class="small" style="margin-top:8px">登録内容・配達記録はこの端末内に保存されます。端末間の同期はありません。</div>
   `;
 }
 
@@ -186,7 +190,58 @@ function checkRow(label, count, type){
   return `<button class="check-item" data-filter="${type}"><strong>${label}</strong><span class="check-count">${count}</span></button>`;
 }
 
+function renderCustomerForm(){
+  const c = state.customers.find(x => x.id === editingCustomerId);
+  return `<form id="customerForm" class="panel customer-form">
+    <label for="customerName">顧客名 <span class="small">必須</span></label>
+    <input id="customerName" name="customerName" autocomplete="off" maxlength="80" required value="${escapeHtml(c?.name || '')}" />
+    <label for="customerAddress">住所 <span class="small">必須</span></label>
+    <textarea id="customerAddress" name="customerAddress" autocomplete="off" maxlength="300" required placeholder="都道府県から番地・建物名まで">${escapeHtml(c?.address || '')}</textarea>
+    <label for="customerArea">地区 <span class="small">任意</span></label>
+    <input id="customerArea" name="customerArea" autocomplete="off" maxlength="80" value="${escapeHtml(c?.area || '')}" placeholder="例：今市（空欄なら未分類）" />
+    <p class="small">この端末内に保存します。ブラウザのデータを削除すると登録内容も消えます。ナビを押すと住所をGoogle Mapsへ渡します。</p>
+    <div class="toggle-grid">
+      <button type="button" class="action-btn action-secondary" data-cancel-customer>キャンセル</button>
+      <button type="submit" class="action-btn action-primary">保存</button>
+    </div>
+  </form>`;
+}
+
+function openCustomerForm(id = null){
+  editingCustomerId = id;
+  setScreen('customer');
+}
+
+function saveCustomerForm(event){
+  event.preventDefault();
+  const form = event.currentTarget;
+  const name = form.elements.customerName.value.trim();
+  const address = form.elements.customerAddress.value.trim();
+  const area = form.elements.customerArea.value.trim() || '未分類';
+  if (!name || !address) { alert('顧客名と住所を入力してください。'); return; }
+  const next = clone(state);
+  let customer = next.customers.find(c => c.id === editingCustomerId);
+  if (editingCustomerId && !customer) { alert('編集する顧客が見つかりません。'); return; }
+  if (customer) {
+    Object.assign(customer, {name, address, area, customized:true});
+  } else {
+    const id = 'U-' + (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+    customer = {id, name, address, area, items:[], recovery:[], memo:'', status:'pending', added:false, changed:false, note:'', registered:true};
+    next.customers.push(customer);
+  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+  catch(e) { alert('端末に保存できませんでした。空き容量やブラウザの設定を確認してください。入力はこの画面に残っています。'); return; }
+  state = next;
+  currentCustomerId = customer.id;
+  setScreen('delivery');
+}
+
 function wireEvents(){
+  document.querySelector('[data-add-customer]')?.addEventListener('click', () => openCustomerForm());
+  document.querySelector('[data-edit-customer]')?.addEventListener('click', () => openCustomerForm(currentCustomerId));
+  document.getElementById('customerForm')?.addEventListener('submit', saveCustomerForm);
+  document.querySelector('[data-cancel-customer]')?.addEventListener('click', () => setScreen(editingCustomerId ? 'delivery' : 'list'));
+
   document.querySelectorAll('[data-open-customer]').forEach(btn => {
     btn.addEventListener('click', () => { currentCustomerId = btn.dataset.openCustomer; setScreen('delivery'); });
   });
@@ -261,8 +316,14 @@ function showFiltered(type){
 }
 
 function resetDemo(){
-  if (!confirm('架空データを初期状態に戻しますか？')) return;
-  state = {customers: clone(demoCustomers)};
+  if (!confirm('登録した顧客・編集した住所は残し、未編集のデモデータを初期状態に戻しますか？')) return;
+  const retained = state.customers.filter(c => c.registered || c.customized);
+  const customers = clone(demoCustomers).map(c => retained.find(x => x.id === c.id) || c);
+  customers.push(...retained.filter(c => !customers.some(x => x.id === c.id)));
+  const next = { ...state, customers };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+  catch(e) { alert('初期化を保存できませんでした。登録内容は変更していません。'); return; }
+  state = next;
   currentCustomerId = state.customers[0].id;
   saveState(); setScreen('list');
 }
