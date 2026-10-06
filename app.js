@@ -13,6 +13,7 @@ const demoCustomers = [
   { id:'C010', area:'大沢', name:'松本 久美', address:'栃木県日光市大沢町80-2', items:[{name:'台所用スポンジ',qty:2},{name:'玄関マット',qty:1}], recovery:[{name:'玄関マット',planned:1,actual:1}], memo:'次回スポンジ追加の可能性あり。' },
 ].map(c => ({...c, status:'pending', added:false, changed:false, note:''}));
 
+let storageBlocked = false;
 let state = loadState();
 let currentScreen = 'list';
 let editingCustomerId = null;
@@ -22,11 +23,14 @@ function clone(v){ return JSON.parse(JSON.stringify(v)); }
 function loadState(){
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch(e) {}
+    if (saved) return DeliverySecurity.parseState(saved);
+  } catch(e) { storageBlocked = true; return {customers:[]}; }
   return { customers: clone(demoCustomers) };
 }
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveState(){
+  if (storageBlocked || !DeliverySecurity.validState(state)) throw new Error('保存データの形式が正しくありません。');
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 
 function statusLabel(status){
   return status === 'done' ? '完了' : status === 'absent' ? '不在' : '未配達';
@@ -50,6 +54,12 @@ function setScreen(screen){
 }
 
 function render(){
+  if (storageBlocked) {
+    document.getElementById('screenTitle').textContent = '保存データを確認してください';
+    document.getElementById('topCount').textContent = '操作停止';
+    document.getElementById('main').innerHTML = '<div class="warning-box">保存データを読み込めないため操作を停止しました。元データは削除していません。ブラウザのデータを初期化せず、データの形式を確認してください。</div>';
+    return;
+  }
   const counts = getCounts();
   document.getElementById('topCount').textContent = `残り ${counts.pending}件`;
   const title = currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
@@ -71,7 +81,7 @@ function renderList(){
     <div class="section-title">${escapeHtml(area)}</div>
     <div class="customer-list">
       ${customers.map(c => `
-        <button class="customer-card ${c.status}" data-open-customer="${c.id}">
+        <button class="customer-card ${escapeHtml(c.status)}" data-open-customer="${escapeHtml(c.id)}">
           <div class="customer-top">
             <div>
               <div class="area">${escapeHtml(c.area)}</div>
@@ -127,7 +137,7 @@ function renderDelivery(){
           <div><div class="item-name">${escapeHtml(r.name)}</div><div class="small">予定 ${r.planned}</div></div>
           <div class="stepper">
             <button data-step="-1" data-recovery="${idx}" aria-label="減らす">−</button>
-            <input inputmode="numeric" pattern="[0-9]*" value="${r.actual}" data-recovery-input="${idx}" aria-label="回収数" />
+            <input inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(r.actual)}" data-recovery-input="${idx}" aria-label="回収数" />
             <button data-step="1" data-recovery="${idx}" aria-label="増やす">＋</button>
           </div>
         </div>
@@ -140,7 +150,7 @@ function renderDelivery(){
         <button class="toggle-btn ${c.added ? 'on' : ''}" data-toggle="added">追加 ${c.added ? 'あり' : 'なし'}</button>
         <button class="toggle-btn ${c.changed ? 'on' : ''}" data-toggle="changed">変更 ${c.changed ? 'あり' : 'なし'}</button>
       </div>
-      <textarea id="noteInput" placeholder="必要な時だけメモ">${escapeHtml(c.note || '')}</textarea>
+      <textarea maxlength="20000" id="noteInput" placeholder="必要な時だけメモ">${escapeHtml(c.note || '')}</textarea>
     </section>
 
     <div class="action-grid">
@@ -218,7 +228,7 @@ function saveCustomerForm(event){
   const name = form.elements.customerName.value.trim();
   const address = form.elements.customerAddress.value.trim();
   const area = form.elements.customerArea.value.trim() || '未分類';
-  if (!name || !address) { alert('顧客名と住所を入力してください。'); return; }
+  if (!DeliverySecurity.validateCustomer(name, address, area)) { alert('顧客名と住所を入力してください。'); return; }
   const next = clone(state);
   let customer = next.customers.find(c => c.id === editingCustomerId);
   if (editingCustomerId && !customer) { alert('編集する顧客が見つかりません。'); return; }
@@ -229,6 +239,7 @@ function saveCustomerForm(event){
     customer = {id, name, address, area, items:[], recovery:[], memo:'', status:'pending', added:false, changed:false, note:'', registered:true};
     next.customers.push(customer);
   }
+  if (storageBlocked || !DeliverySecurity.validState(next)) { alert('保存するデータの形式を確認してください。'); return; }
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
   catch(e) { alert('端末に保存できませんでした。空き容量やブラウザの設定を確認してください。入力はこの画面に残っています。'); return; }
   state = next;
@@ -302,7 +313,7 @@ function markAndAdvance(status){
 function openMaps(){
   const c = getCurrentCustomer(); if (!c) return;
   const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address)}&travelmode=driving`;
-  window.open(url, '_blank', 'noopener');
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function showFiltered(type){

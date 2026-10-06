@@ -1,10 +1,11 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.2.2';
+const CACHE = CACHE_PREFIX + 'v0.2.3-security1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './security.js',
   './manifest.webmanifest',
   './apple-touch-icon.png',
   './icon-192.png',
@@ -12,7 +13,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS.map(asset => new Request(new URL(asset, self.registration.scope), {cache:'reload'})))));
   self.skipWaiting();
 });
 
@@ -27,17 +28,26 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
-
-  event.respondWith(
-    caches.open(CACHE).then(cache => cache.match(event.request)).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') return response;
-        const copy = response.clone();
-        caches.open(CACHE).then(cache => cache.put(event.request, copy));
-        return response;
-      }).catch(() => caches.open(CACHE).then(cache => cache.match('./index.html')));
-    })
-  );
+  const scope = new URL(self.registration.scope);
+  if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
+  // Cache only the app's known static assets, never arbitrary user-data URLs.
+  const allowed = ASSETS.some(asset => new URL(asset, self.registration.scope).pathname === url.pathname);
+  if (!allowed) return;
+  event.respondWith(caches.open(CACHE).then(async cache => {
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    try {
+      const response = await fetch(event.request);
+      if (response.status === 200 && response.type === 'basic' && !url.search && !response.redirected) {
+        await cache.put(event.request, response.clone());
+      }
+      return response;
+    } catch (e) {
+      if (event.request.mode === 'navigate') {
+        const fallback = await cache.match('./index.html');
+        if (fallback) return fallback;
+      }
+      return Response.error();
+    }
+  }));
 });
