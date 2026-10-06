@@ -35,6 +35,7 @@
     const raw=random(32), key=await aes(raw), kek=await passwordKey(password,v.kdf);
     v.wrapped=await seal(kek,raw,v.id+'password');
     v.payload=await seal(key,enc.encode(JSON.stringify(data)),v.id+'data'); raw.fill(0);
+    parse(JSON.stringify(v));
     return {v,key,kek};
   }
   async function passkeyKey(info){
@@ -62,7 +63,7 @@
   function status(){ $('vaultStatus').textContent=pending?'暗号化して保存中…':'暗号化保存済み'; }
   function write(v,expected){
     if(localStorage.getItem(KEY)!==expected) throw Error('別の画面で保存内容が変わりました。ロックして開き直してください。');
-    const raw=JSON.stringify(v); localStorage.setItem(KEY,raw);
+    const raw=JSON.stringify(v); parse(raw); localStorage.setItem(KEY,raw);
     if(localStorage.getItem(KEY)!==raw) throw Error('保存内容の確認に失敗しました。');
     if(channel) channel.postMessage('changed');
     return raw;
@@ -94,6 +95,7 @@
     if(!session || !DeliverySecurity.validState(data)) return Promise.reject(Error('保存できる状態ではありません。'));
     const json=JSON.stringify(data), s=session; pending++; $('app').inert=true; status();
     const task=queue.then(async()=>{
+      if(json.length>10000000) throw Error('保存データが大きすぎます。');
       const v={...s.v,revision:b64(random(16)),payload:await seal(s.key,enc.encode(json),s.v.id+'data')};
       await storageLock(()=>{s.raw=write(v,s.raw); s.v=v;});
     });
