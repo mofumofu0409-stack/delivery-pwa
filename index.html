@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="配達サポート" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>定期配達サポート v0.2</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="installHint" class="install-hint" hidden>
+    <div class="install-hint__body">
+      <strong>iPhoneのホーム画面に追加できます</strong>
+      <span>Safariの共有ボタン →「ホーム画面に追加」</span>
+    </div>
+    <button id="dismissInstallHint" class="install-hint__close" aria-label="閉じる">×</button>
+  </div>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">定期配達サポート</div>
+        <h1 id="screenTitle">今日の配達</h1>
+      </div>
+      <div id="topCount" class="count-badge">残り 0件</div>
+    </header>
+
+    <main id="main" class="main"></main>
+
+    <nav class="bottom-nav" aria-label="メインメニュー">
+      <button class="nav-btn active" data-screen="list" aria-label="一覧">
+        <span class="nav-icon">☰</span><span>一覧</span>
+      </button>
+      <button class="nav-btn" data-screen="delivery" aria-label="配達">
+        <span class="nav-icon">🚚</span><span>配達</span>
+      </button>
+      <button class="nav-btn" data-screen="check" aria-label="確認">
+        <span class="nav-icon">✓</span><span>確認</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
