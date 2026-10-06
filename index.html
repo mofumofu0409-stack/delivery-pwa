@@ -15,6 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="vault.css" />
 </head>
 <body>
   <div id="installHint" class="install-hint" hidden>
@@ -24,7 +25,46 @@
     </div>
     <button id="dismissInstallHint" class="install-hint__close" aria-label="閉じる">×</button>
   </div>
-  <div id="app" class="app-shell">
+  <section id="vaultGate" class="vault-card" aria-label="アプリのロック">
+    <h1 id="vaultHeading">顧客データの暗号化を設定</h1>
+    <p id="vaultHelp"></p>
+    <form id="vaultForm">
+      <label>アプリのパスワード<input id="vaultPassword" type="password" autocomplete="off" maxlength="256" required /></label>
+      <label id="vaultConfirmLabel">パスワードを再入力<input id="vaultConfirm" type="password" autocomplete="off" maxlength="256" /></label>
+      <button id="vaultSubmit" type="submit" data-vault-action>暗号化して開始</button>
+    </form>
+    <p id="vaultMessage" role="status"></p>
+    <p>パスワードはチャットに送らず、この画面に入力してください。データはこの端末内に保存します。</p>
+  </section>
+  <div id="vaultTools" class="vault-tools" hidden>
+    <span id="vaultStatus" role="status"></span>
+    <button id="vaultSettings" type="button">保護・バックアップ</button>
+    <button id="vaultLock" type="button">ロック</button>
+  </div>
+  <section id="vaultPanel" class="vault-card" hidden aria-label="保護とバックアップ">
+    <h2>保護・バックアップ</h2>
+    <p id="passkeyState"></p>
+    <p>2分間操作がないとロックします。別のアプリやタブへ移動した場合もロックします。ナビから戻ったら再解除してください。</p>
+    <button id="passkeySetup" type="button" data-vault-action>パスキーを追加（対応端末）</button>
+    <p>登録後はパスワードとパスキーの両方が必要です。Face ID・Touch ID・端末パスコードのどれを使うかは端末が決めます。登録が非対応・中止ならパスワード方式を維持します。先にバックアップを作成してください。</p>
+    <h3>暗号化バックアップを作成</h3>
+    <form id="backupForm">
+      <label>バックアップ専用パスワード（12文字以上）<input id="backupPassword" type="password" autocomplete="new-password" maxlength="256" required /></label>
+      <label>再入力<input id="backupConfirm" type="password" autocomplete="new-password" maxlength="256" required /></label>
+      <button type="submit" data-vault-action>暗号化してファイルを保存</button>
+    </form>
+    <p>バックアップは専用パスワードで復元できます。端末のパスキーは不要です。ファイルとパスワードを別々に保管してください。</p>
+    <h3>バックアップから復元</h3>
+    <form id="restoreForm">
+      <label>暗号化ファイル<input id="restoreFile" type="file" accept=".json,application/json" required /></label>
+      <label>バックアップ専用パスワード<input id="restorePassword" type="password" autocomplete="off" maxlength="256" required /></label>
+      <button type="submit" data-vault-action>確認して復元</button>
+    </form>
+    <p>復元は現在の顧客データを置き換えます。先に現在のデータをバックアップしてください。新しい端末では、先にアプリの暗号化設定を行います。</p>
+    <p id="panelMessage" role="status"></p>
+    <button id="vaultClosePanel" type="button">閉じる</button>
+  </section>
+  <div id="app" class="app-shell" hidden>
     <header class="topbar">
       <div>
         <div class="eyebrow">定期配達サポート</div>
@@ -49,6 +89,7 @@
   </div>
 
   <script src="security.js"></script>
+  <script src="vault.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

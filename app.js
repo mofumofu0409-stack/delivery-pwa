@@ -14,23 +14,18 @@ const demoCustomers = [
 ].map(c => ({...c, status:'pending', added:false, changed:false, note:''}));
 
 let storageBlocked = false;
-let state = loadState();
+let state = {customers:[]};
+let vaultUnlocked = false;
 let currentScreen = 'list';
 let editingCustomerId = null;
 let currentCustomerId = state.customers.find(c => c.status === 'pending')?.id || state.customers[0]?.id;
 
 function clone(v){ return JSON.parse(JSON.stringify(v)); }
-function loadState(){
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return DeliverySecurity.parseState(saved);
-  } catch(e) { storageBlocked = true; return {customers:[]}; }
-  return { customers: clone(demoCustomers) };
+async function saveState(){
+  if (!vaultUnlocked || !DeliverySecurity.validState(state)) throw new Error('保存できる状態ではありません。');
+  return DeliveryVault.save(state);
 }
-function saveState(){
-  if (storageBlocked || !DeliverySecurity.validState(state)) throw new Error('保存データの形式が正しくありません。');
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
+window.deliveryDemoState = () => ({customers:clone(demoCustomers)});
 
 function statusLabel(status){
   return status === 'done' ? '完了' : status === 'absent' ? '不在' : '未配達';
@@ -54,6 +49,7 @@ function setScreen(screen){
 }
 
 function render(){
+  if (!vaultUnlocked) return;
   if (storageBlocked) {
     document.getElementById('screenTitle').textContent = '保存データを確認してください';
     document.getElementById('topCount').textContent = '操作停止';
@@ -222,7 +218,7 @@ function openCustomerForm(id = null){
   setScreen('customer');
 }
 
-function saveCustomerForm(event){
+async function saveCustomerForm(event){
   event.preventDefault();
   const form = event.currentTarget;
   const name = form.elements.customerName.value.trim();
@@ -240,7 +236,7 @@ function saveCustomerForm(event){
     next.customers.push(customer);
   }
   if (storageBlocked || !DeliverySecurity.validState(next)) { alert('保存するデータの形式を確認してください。'); return; }
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+  try { await DeliveryVault.save(next); if(!vaultUnlocked) return; }
   catch(e) { alert('端末に保存できませんでした。空き容量やブラウザの設定を確認してください。入力はこの画面に残っています。'); return; }
   state = next;
   currentCustomerId = customer.id;
@@ -257,29 +253,29 @@ function wireEvents(){
     btn.addEventListener('click', () => { currentCustomerId = btn.dataset.openCustomer; setScreen('delivery'); });
   });
   document.querySelectorAll('[data-step]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const c = getCurrentCustomer(); if (!c) return;
       const idx = Number(btn.dataset.recovery);
       c.recovery[idx].actual = Math.max(0, Number(c.recovery[idx].actual || 0) + Number(btn.dataset.step));
-      saveState(); render();
+      try { await saveState(); if(vaultUnlocked) render(); } catch(e) {}
     });
   });
   document.querySelectorAll('[data-recovery-input]').forEach(input => {
-    input.addEventListener('change', () => {
+    input.addEventListener('change', async () => {
       const c = getCurrentCustomer(); if (!c) return;
       const idx = Number(input.dataset.recoveryInput);
       c.recovery[idx].actual = Math.max(0, Number(input.value || 0));
-      saveState(); render();
+      try { await saveState(); if(vaultUnlocked) render(); } catch(e) {}
     });
   });
   document.querySelectorAll('[data-toggle]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const c = getCurrentCustomer(); if (!c) return;
-      c[btn.dataset.toggle] = !c[btn.dataset.toggle]; saveState(); render();
+      c[btn.dataset.toggle] = !c[btn.dataset.toggle]; try { await saveState(); if(vaultUnlocked) render(); } catch(e) {}
     });
   });
   const noteInput = document.getElementById('noteInput');
-  if (noteInput) noteInput.addEventListener('input', () => { const c = getCurrentCustomer(); if (c) { c.note = noteInput.value; saveState(); } });
+  if (noteInput) noteInput.addEventListener('input', () => { const c = getCurrentCustomer(); if (c) { c.note = noteInput.value; saveState().catch(()=>{}); } });
 
   const mapsBtn = document.querySelector('[data-nav-maps]');
   if (mapsBtn) mapsBtn.addEventListener('click', openMaps);
@@ -298,12 +294,13 @@ function wireEvents(){
 function getCurrentCustomer(){ return state.customers.find(c => c.id === currentCustomerId); }
 function sumItems(items){ return items.reduce((s,i) => s + Number(i.qty || 0), 0); }
 
-function markAndAdvance(status){
+async function markAndAdvance(status){
   const c = getCurrentCustomer(); if (!c) return;
   const noteInput = document.getElementById('noteInput');
   if (noteInput) c.note = noteInput.value;
   c.status = status;
-  saveState();
+  try { await saveState(); } catch(e) { return; }
+  if(!vaultUnlocked) return;
   const idx = state.customers.findIndex(x => x.id === c.id);
   const next = state.customers.slice(idx + 1).find(x => x.status === 'pending') || state.customers.find(x => x.status === 'pending');
   if (next) { currentCustomerId = next.id; render(); }
@@ -326,25 +323,34 @@ function showFiltered(type){
   alert(list.map(c => `${c.area} ${c.name}`).join('\n'));
 }
 
-function resetDemo(){
+async function resetDemo(){
   if (!confirm('登録した顧客・編集した住所は残し、未編集のデモデータを初期状態に戻しますか？')) return;
   const retained = state.customers.filter(c => c.registered || c.customized);
   const customers = clone(demoCustomers).map(c => retained.find(x => x.id === c.id) || c);
   customers.push(...retained.filter(c => !customers.some(x => x.id === c.id)));
   const next = { ...state, customers };
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+  try { await DeliveryVault.save(next); if(!vaultUnlocked) return; }
   catch(e) { alert('初期化を保存できませんでした。登録内容は変更していません。'); return; }
   state = next;
   currentCustomerId = state.customers[0].id;
-  saveState(); setScreen('list');
+  setScreen('list');
 }
 
 function escapeHtml(value=''){
   return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 }
 
-document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => setScreen(btn.dataset.screen)));
-render();
+document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {if(vaultUnlocked)setScreen(btn.dataset.screen);}));
+DeliveryVault.init(data => {
+  state=data; vaultUnlocked=true; storageBlocked=false; currentScreen='list'; editingCustomerId=null;
+  currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;
+  setScreen('list');
+}, () => {
+  vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
+  document.getElementById('main').replaceChildren();
+  document.getElementById('screenTitle').textContent='ロック中';
+  document.getElementById('topCount').textContent='';
+});
 
 
 
@@ -355,11 +361,11 @@ function setupInstallHint(){
   const ua = navigator.userAgent || '';
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  const dismissed = localStorage.getItem('delivery_install_hint_dismissed') === '1';
+  let dismissed=false; try {dismissed=localStorage.getItem('delivery_install_hint_dismissed')==='1';} catch(e) {}
   if (isIOS && !standalone && !dismissed) hint.hidden = false;
   if (dismiss) dismiss.addEventListener('click', () => {
     hint.hidden = true;
-    localStorage.setItem('delivery_install_hint_dismissed', '1');
+    try {localStorage.setItem('delivery_install_hint_dismissed','1');} catch(e) {}
   });
 }
 setupInstallHint();

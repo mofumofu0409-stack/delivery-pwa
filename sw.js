@@ -1,11 +1,13 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.2.3-security1';
+const CACHE = CACHE_PREFIX + 'v0.2.4-vault1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './security.js',
+  './vault.js',
+  './vault.css',
   './manifest.webmanifest',
   './apple-touch-icon.png',
   './icon-192.png',
