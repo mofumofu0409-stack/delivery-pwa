@@ -51,7 +51,7 @@ function setScreen(screen){
     document.getElementById('restoreFile').value='';
   }
   currentScreen = screen;
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.screen === screen));
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.screen === screen || (btn.dataset.screen==='calendar'&&screen==='list')));
   render();
 }
 
@@ -66,7 +66,7 @@ function render(){
   const counts = getCounts();
   document.getElementById('topCount').textContent = currentScreen==='calendar'?`${calendarWeek(calendarSelected)}週`:`残り ${counts.pending}件`;
   document.getElementById('app').classList?.toggle('calendar-shell',currentScreen==='calendar');
-  const title = currentScreen === 'calendar' ? '配達カレンダー' : currentScreen === 'settings' ? '設定' : currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
+  const title = currentScreen === 'calendar' ? '配達カレンダー' : currentScreen === 'settings' ? '設定' : currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '配達一覧' : currentScreen === 'delivery' ? '配達' : '最終チェック';
   document.getElementById('screenTitle').textContent = title;
 
   const main = document.getElementById('main');
@@ -103,6 +103,7 @@ function renderList(){
   `).join('');
 
   return `
+    ${renderCalendarSwitcher('list')}
     <section class="summary-card">
       <div class="summary-row">
         <div class="metric"><span class="num">${counts.pending}</span><span class="label">残り</span></div>

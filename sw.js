@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.4.0-calendar1';
+const CACHE = CACHE_PREFIX + 'v0.4.2-unified-plans1';
 const ASSETS = [
   './',
   './index.html',
@@ -59,3 +59,4 @@ self.addEventListener('fetch', event => {
     }
   }));
 });
+
