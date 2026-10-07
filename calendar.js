@@ -49,12 +49,12 @@ function renderCalendar(){
   const cells=Array.from({length:days},(_,i)=>{
     const key=calendarKey(start+i),d=new Date((start+i)*86400000),plans=calendarPlans(key),selected=key===calendarSelected,holiday=calendarHoliday(key);
     return `<button type="button" class="calendar-day ${holiday?'holiday':''} ${calendarMode==='month'&&d.getUTCMonth()!==month?'outside':''} ${selected?'selected':''} ${key===today?'today':''}" data-calendar-day="${key}" aria-label="${key} ${calendarWeek(key)}週 ${holiday?holiday+' ':''}${plans.map(p=>p.label).join('、')||'予定なし'}" aria-pressed="${selected}">
-      <span class="calendar-date">${d.getUTCDate()}${calendarMode==='week'?`<small>${weekday[d.getUTCDay()]}曜</small>`:''}<small>${calendarWeek(key)}週</small>${holiday?`<small class="calendar-holiday">${calendarMode==='week'?holiday:'祝'}</small>`:''}</span>
+      <span class="calendar-date">${d.getUTCDate()}${calendarMode==='week'?`<small>${weekday[d.getUTCDay()]}曜</small>`:''}${calendarMode==='month'&&d.getUTCDay()===0?`<small class="calendar-week-label">${calendarWeek(key)}週</small>`:''}${holiday?`<small class="calendar-holiday">${calendarMode==='week'?holiday:'祝'}</small>`:''}</span>
       <span class="calendar-events">${plans.slice(0,calendarMode==='month'?3:500).map(p=>`<span class="calendar-event">${escapeHtml(p.label)}${calendarMode==='week'?`<small>${escapeHtml(p.route.name)}・${p.customers.length}件</small>`:''}</span>`).join('')}${plans.length>3&&calendarMode==='month'?`<small>ほか${plans.length-3}ルート</small>`:''}${!plans.length&&calendarMode==='week'?'<small>予定なし</small>':''}</span>
     </button>`;
   }).join('');
   const plans=calendarPlans(calendarSelected);
-  return `<section class="calendar-view"><div class="calendar-toolbar"><button data-calendar-shift="-1" aria-label="前の${calendarMode==='month'?'月':'週'}">‹</button><h2>${title}</h2><button data-calendar-shift="1" aria-label="次の${calendarMode==='month'?'月':'週'}">›</button><button id="calendarToday">今日</button></div>
+  return `<section class="calendar-view"><div class="calendar-toolbar"><button data-calendar-shift="-1" aria-label="前の${calendarMode==='month'?'月':'週'}">‹</button><h2>${title}${calendarMode==='week'?` <small class="calendar-range-week">${calendarWeek(calendarKey(start))}週</small>`:''}</h2><button data-calendar-shift="1" aria-label="次の${calendarMode==='month'?'月':'週'}">›</button><button id="calendarToday">今日</button></div>
     ${renderCalendarSwitcher(calendarMode)}
     ${calendarMode==='week'?'<p class="calendar-swipe-hint">← 左右にスワイプして1週間を確認 →</p>':''}
     <div class="calendar-${calendarMode}" ${calendarMode==='week'?'tabindex="0" aria-label="1週間の予定。左右にスクロールできます"':''}>${calendarMode==='month'?weekday.map(d=>`<div class="calendar-weekday">${d}</div>`).join(''):''}${cells}</div>

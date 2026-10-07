@@ -37,3 +37,6 @@
 .calendar-day.holiday .calendar-date{color:#a13d20;}
 .calendar-date small.calendar-holiday{color:#a13d20;font-weight:700;}
 .calendar-notice{background:#fff4dc;border-left:3px solid #bd8118;padding:10px;color:#704b10;font-size:14px;}
+
+.calendar-date small.calendar-week-label{white-space:nowrap;font-weight:700;}
+.calendar-range-week{display:inline-block;font-size:12px;color:var(--primary);white-space:nowrap;}
