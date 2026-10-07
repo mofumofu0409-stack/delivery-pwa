@@ -46,6 +46,7 @@ function getCounts(){
 
 function setScreen(screen){
   if(currentScreen==='settings' && screen!=='settings'){
+    clearExcelImport();
     for(const id of ['backupPassword','backupConfirm','restorePassword']) document.getElementById(id).value='';
     document.getElementById('restoreFile').value='';
   }
@@ -72,7 +73,7 @@ function render(){
   if (currentScreen === 'delivery') main.innerHTML = renderDelivery();
   if (currentScreen === 'check') main.innerHTML = renderCheck();
   if (currentScreen === 'customer') main.innerHTML = renderCustomerForm();
-  if (currentScreen === 'settings') main.innerHTML = renderRouteSettings();
+  if (currentScreen === 'settings') main.innerHTML = renderExcelImport()+renderRouteSettings();
   document.getElementById('vaultPanel').hidden = currentScreen !== 'settings';
   wireEvents();
 }
@@ -124,6 +125,7 @@ function renderDelivery(){
       <div class="detail-area">${escapeHtml(c.area)}地区</div>
       <div class="detail-name">${escapeHtml(c.name)}さん</div>
       <div class="address">${escapeHtml(c.address)}</div>
+      ${c.source ? `<details class="small"><summary>顧客コード・連絡先</summary><p>顧客コード：${escapeHtml(c.source.customerCode)}<br>郵便番号：${escapeHtml(c.source.postalCode)}<br>電話番号：${escapeHtml(c.source.phone)}<br>担当者：${escapeHtml(c.source.assignee)}<br>ルートコード：${escapeHtml(c.source.routeCode)}</p></details>` : ''}
       <button class="link-btn" data-edit-customer>顧客名・住所を編集</button>
       <div class="big-number">配達 ${sumItems(c.items)}品</div>
       ${c.memo ? `<div class="warning-box" style="margin-top:12px">注意：${escapeHtml(c.memo)}</div>` : ''}
@@ -131,7 +133,7 @@ function renderDelivery(){
 
     <section class="panel">
       <h2>今回の配達</h2>
-      ${c.items.map(i => `<div class="item-row"><span class="item-name">${escapeHtml(i.name)}</span><span class="item-qty">× ${i.qty}</span></div>`).join('')}
+      ${c.items.map(i => `<div class="item-row"><span class="item-name">${escapeHtml(i.name)}${i.model?`<small class="excel-item-meta">品記号 ${escapeHtml(i.model)}</small>`:''}${i.contractAmount!==undefined?`<small class="excel-item-meta">契約税込金額 ${i.contractAmount.toLocaleString('ja-JP')}円</small>`:''}</span><span class="item-qty">× ${i.qty}</span></div>`).join('')}
     </section>
 
     <section class="panel">
@@ -302,6 +304,7 @@ async function saveRouteForm(event){
 }
 
 function wireEvents(){
+  wireExcelImport();
   document.getElementById('routePickArea')?.addEventListener('click',()=>{
     const area=document.getElementById('routeArea').value;if(!area)return;
     const members=[...document.querySelectorAll('[data-route-member]')],orders=[...document.querySelectorAll('[data-route-order]')];let order=0;
@@ -415,6 +418,7 @@ DeliveryVault.init(data => {
   resumeLocation=null;setScreen(currentScreen);
 }, () => {
   if(vaultUnlocked) resumeLocation={screen:['delivery','check','settings'].includes(currentScreen)?currentScreen:'list',customerId:currentCustomerId};
+  clearExcelImport();
   vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
   document.getElementById('main').replaceChildren();
   document.getElementById('screenTitle').textContent='ロック中';

@@ -25,13 +25,16 @@
       if (!['pending', 'done', 'absent'].includes(c.status) || typeof c.added !== 'boolean' || typeof c.changed !== 'boolean') return false;
       if (c.registered !== undefined && typeof c.registered !== 'boolean') return false;
       if (c.customized !== undefined && typeof c.customized !== 'boolean') return false;
+      if(c.source!==undefined){
+        if(!record(c.source)||!['number','assignee','routeCode','customerCode','postalCode','streetNumber','phone'].every(k=>text(c.source[k],100)))return false;
+      }
       if(c.schedule!==undefined){
         const s=c.schedule;
         if(!record(s)||!routeIds.has(s.routeId)||!Number.isInteger(s.order)||s.order<1||s.order>5000)return false;
         const key=s.routeId+':'+s.order;if(routeOrders.has(key))return false;routeOrders.add(key);
       }
       if (!Array.isArray(c.items) || c.items.length > 200 || !Array.isArray(c.recovery) || c.recovery.length > 200) return false;
-      return c.items.every(i => record(i) && text(i.name, 200) && quantity(i.qty)) &&
+      return c.items.every(i => record(i) && text(i.name, 200) && quantity(i.qty) && (i.model===undefined||text(i.model,100)) && (i.contractAmount===undefined||quantity(i.contractAmount))) &&
         c.recovery.every(r => record(r) && text(r.name, 200) && quantity(r.planned) && quantity(r.actual));
     });
   }

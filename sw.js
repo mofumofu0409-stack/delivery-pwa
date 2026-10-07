@@ -1,10 +1,14 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.3.0-routes1';
+const CACHE = CACHE_PREFIX + 'v0.3.1-excel1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './excel-import.js',
+  './excel-ui.js',
+  './excel-worker.js',
+  './xlsx.full.min.js',
   './security.js',
   './vault.js',
   './vault.css',
