@@ -8,6 +8,11 @@
   }
   function validState(value) {
     if (!record(value) || !Array.isArray(value.customers) || value.customers.length > 5000) return false;
+    if(value.calendar!==undefined){
+      const base=value.calendar?.aWeekStart;
+      if(!record(value.calendar)||typeof base!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(base)||base<'2000-01-01'||base>'2100-12-31')return false;
+      const d=new Date(base+'T00:00:00Z');if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==base||d.getUTCDay()!==0)return false;
+    }
     const routeIds=new Set();
     if(value.routes!==undefined){
       if(!Array.isArray(value.routes)||value.routes.length>500)return false;

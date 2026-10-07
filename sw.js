@@ -1,10 +1,12 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.3.1-excel1';
+const CACHE = CACHE_PREFIX + 'v0.4.0-calendar1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './calendar.js',
+  './calendar.css',
   './excel-import.js',
   './excel-ui.js',
   './excel-worker.js',

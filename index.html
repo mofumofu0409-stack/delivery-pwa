@@ -16,6 +16,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="vault.css" />
+  <link rel="stylesheet" href="calendar.css" />
 </head>
 <body>
   <div id="installHint" class="install-hint" hidden>
@@ -83,6 +84,7 @@
 
 
     <nav class="bottom-nav" aria-label="メインメニュー">
+      <button class="nav-btn" data-screen="calendar" aria-label="カレンダー"><span class="nav-icon">▦</span><span>予定</span></button>
       <button class="nav-btn active" data-screen="list" aria-label="一覧">
         <span class="nav-icon">☰</span><span>一覧</span>
       </button>
@@ -102,6 +104,7 @@
   <script src="vault.js"></script>
   <script src="excel-import.js"></script>
   <script src="excel-ui.js"></script>
+  <script src="calendar.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

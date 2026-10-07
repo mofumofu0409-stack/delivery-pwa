@@ -64,16 +64,18 @@ function render(){
     return;
   }
   const counts = getCounts();
-  document.getElementById('topCount').textContent = `残り ${counts.pending}件`;
-  const title = currentScreen === 'settings' ? '設定' : currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
+  document.getElementById('topCount').textContent = currentScreen==='calendar'?`${calendarWeek(calendarSelected)}週`:`残り ${counts.pending}件`;
+  document.getElementById('app').classList?.toggle('calendar-shell',currentScreen==='calendar');
+  const title = currentScreen === 'calendar' ? '配達カレンダー' : currentScreen === 'settings' ? '設定' : currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
   document.getElementById('screenTitle').textContent = title;
 
   const main = document.getElementById('main');
+  if (currentScreen === 'calendar') main.innerHTML = renderCalendar();
   if (currentScreen === 'list') main.innerHTML = renderList();
   if (currentScreen === 'delivery') main.innerHTML = renderDelivery();
   if (currentScreen === 'check') main.innerHTML = renderCheck();
   if (currentScreen === 'customer') main.innerHTML = renderCustomerForm();
-  if (currentScreen === 'settings') main.innerHTML = renderExcelImport()+renderRouteSettings();
+  if (currentScreen === 'settings') main.innerHTML = renderExcelImport()+renderCalendarSettings()+renderRouteSettings();
   document.getElementById('vaultPanel').hidden = currentScreen !== 'settings';
   wireEvents();
 }
@@ -276,7 +278,7 @@ function renderRouteSettings(){
       <button type="submit">${route?'ルートと配達順を保存':'ルートを登録'}</button>
     </form>
     <p id="routeMessage" role="status"></p>
-    <p>日付からのA〜D週判定と祝日変更は、カレンダーの基準設定後に追加します。</p>
+    <p>登録した予定はカレンダーに表示します。祝日の振替は未対応です。</p>
     ${routes.map(r=>`<details><summary>${escapeHtml(r.name)}：${r.week}週・${days[r.weekday]}曜</summary><ol>${state.customers.filter(c=>c.schedule?.routeId===r.id).sort((a,b)=>a.schedule.order-b.schedule.order).map(c=>`<li value="${c.schedule.order}">${escapeHtml(c.name)}（${escapeHtml(c.area)}）</li>`).join('')}</ol></details>`).join('')}
   </section>`;
 }
@@ -304,6 +306,7 @@ async function saveRouteForm(event){
 }
 
 function wireEvents(){
+  wireCalendar();
   wireExcelImport();
   document.getElementById('routePickArea')?.addEventListener('click',()=>{
     const area=document.getElementById('routeArea').value;if(!area)return;
@@ -412,12 +415,12 @@ function escapeHtml(value=''){
 
 document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {if(vaultUnlocked)setScreen(btn.dataset.screen);}));
 DeliveryVault.init(data => {
-  state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'list'; editingCustomerId=null;
+  state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'calendar'; editingCustomerId=null;
   currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;
   if(resumeLocation?.customerId && state.customers.some(c=>c.id===resumeLocation.customerId)) currentCustomerId=resumeLocation.customerId;
   resumeLocation=null;setScreen(currentScreen);
 }, () => {
-  if(vaultUnlocked) resumeLocation={screen:['delivery','check','settings'].includes(currentScreen)?currentScreen:'list',customerId:currentCustomerId};
+  if(vaultUnlocked) resumeLocation={screen:['calendar','delivery','check','settings'].includes(currentScreen)?currentScreen:'list',customerId:currentCustomerId};
   clearExcelImport();
   vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
   document.getElementById('main').replaceChildren();
