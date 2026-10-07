@@ -73,6 +73,8 @@
     $('vaultGate').hidden=false; $('app').hidden=true; $('vaultTools').hidden=true;
     $('vaultPassword').value=''; $('vaultConfirm').value='';
     const exists=localStorage.getItem(KEY)!==null;
+    const resetAvailable=exists || localStorage.getItem(LEGACY)!==null;
+    $('vaultReset').hidden=!resetAvailable; $('vaultResetHelp').hidden=!resetAvailable;
     $('vaultHeading').textContent=exists?'配達アプリをロック解除':'顧客データの暗号化を設定';
     $('vaultConfirmLabel').hidden=exists;
     $('vaultSubmit').textContent=exists?'ロック解除':'暗号化して開始';
@@ -138,6 +140,18 @@
       }
     });
   }
+  async function resetStorage(){
+    if(session) return;
+    if(!confirm('この配達アプリの端末内データをすべて消してやり直しますか？\n顧客情報・配達記録・アプリのパスワード設定が消えます。元に戻せません。\nバックアップファイルや他のアプリのデータは消しません。')) return;
+    await queue;
+    await storageLock(()=>{
+      localStorage.removeItem(LEGACY);
+      localStorage.removeItem(KEY);
+      if(localStorage.getItem(KEY)!==null || localStorage.getItem(LEGACY)!==null) throw Error('初期化を確認できません。');
+      if(channel) channel.postMessage('changed');
+    });
+    lock(); message('初期化しました。新しいパスワードを2回入力してください。端末に登録した以前のパスキーは自動削除されません。');
+  }
   async function enroll(){
     await queue; const s=session, token=epoch;
     if(!s || s.v.biometric) return;
@@ -162,6 +176,7 @@
     startCallback=onStart;lockCallback=onLock;
     if(!crypto?.subtle || !window.isSecureContext){message('HTTPSとWeb Cryptoに対応するブラウザが必要です。');$('vaultSubmit').disabled=true;return;}
     $('vaultForm').addEventListener('submit',submit);
+    $('vaultReset').addEventListener('click',()=>run(resetStorage));
     $('vaultLock').addEventListener('click',lock);
     $('vaultSettings').addEventListener('click',()=>{$('vaultPanel').hidden=!$('vaultPanel').hidden;});
     $('vaultClosePanel').addEventListener('click',()=>{$('vaultPanel').hidden=true;$('backupPassword').value='';$('backupConfirm').value='';});
