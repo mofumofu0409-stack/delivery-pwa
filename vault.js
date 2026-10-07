@@ -78,7 +78,7 @@
     $('vaultHeading').textContent=exists?'配達アプリをロック解除':'顧客データの暗号化を設定';
     $('vaultConfirmLabel').hidden=exists;
     $('vaultSubmit').textContent=exists?'ロック解除':'暗号化して開始';
-    $('vaultHelp').textContent=exists?'アプリのパスワードを入力してください。パスキー登録済みなら、その後に端末認証が必要です。':'12文字以上の専用パスワードを設定してください。忘れると復元できません。既存データは確認してから暗号化し、元の平文保存を消去します。';
+    $('vaultHelp').textContent=exists?'アプリのパスワードを入力してください。パスキー登録済みなら、その後に端末認証が必要です。':'パスワードは12文字以上で登録してください。忘れると復元できません。既存データは確認してから暗号化し、元の平文保存を消去します。';
   }
   function lock(){
     epoch++; session=null;
@@ -126,7 +126,7 @@
     if(busy) return;
     try {
       if(localStorage.getItem(KEY)===null){
-        if(!passwordOK(p)){message('パスワードは12〜256文字で入力してください。');return;}
+        if(!passwordOK(p)){message('パスワードは12文字以上で登録してください。（最大256文字）');return;}
         if(p!==confirm){message('2つのパスワードが一致していません。同じ内容を入力してください。');return;}
       }
     }catch(e){message('このブラウザでは保存領域を利用できません。Safariの通常のタブで開いてください。');return;}
