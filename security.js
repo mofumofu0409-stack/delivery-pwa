@@ -16,6 +16,14 @@
       if(!record(value.calendar)||typeof base!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(base)||base<'2000-01-01'||base>'2100-12-31')return false;
       const d=new Date(base+'T00:00:00Z');if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==base||d.getUTCDay()!==0)return false;
     }
+    if(value.dayNotes!==undefined){
+      if(!Array.isArray(value.dayNotes)||value.dayNotes.length>3000)return false;
+      const dates=new Set();
+      for(const n of value.dayNotes){
+        if(!record(n)||!validDate(n.date)||dates.has(n.date)||!text(n.place,80)||!text(n.note,2000)||(!n.place.trim()&&!n.note.trim()))return false;
+        dates.add(n.date);
+      }
+    }
     if(value.visitDate!==undefined&&!validDate(value.visitDate))return false;
     if(value.visits!==undefined){
       if(!Array.isArray(value.visits)||value.visits.length>10000)return false;

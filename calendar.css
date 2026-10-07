@@ -55,3 +55,5 @@
 .visit-table th,.visit-table td{padding:10px 6px;border-bottom:1px solid var(--line);text-align:left;}
 .visit-table small{display:block;color:var(--muted);}
 .visit-history details{border-top:1px solid var(--line);padding:12px 0;}
+
+.calendar-day-note{margin-top:16px}.calendar-day-note summary{font-weight:700;cursor:pointer}.calendar-day-note textarea{width:100%;box-sizing:border-box}.calendar-note-event{background:#fff5cf;color:#654d00}

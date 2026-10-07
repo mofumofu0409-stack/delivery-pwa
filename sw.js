@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.5.0-visit-history1';
+const CACHE = CACHE_PREFIX + 'v0.5.1-calendar-notes1';
 const ASSETS = [
   './',
   './index.html',
