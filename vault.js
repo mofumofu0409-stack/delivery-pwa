@@ -108,12 +108,29 @@
     if(busy) return; busy=true;
     document.querySelectorAll('[data-vault-action]').forEach(b=>b.disabled=true);
     $('app').inert=true;
-    try{await fn();}catch(e){message('操作できませんでした。パスワード・端末認証・保存容量を確認してください。元の保存データは維持しています。');$('panelMessage').textContent=e.message;}
+    try{await fn();}catch(e){
+      let text;
+      if(e.name==='QuotaExceededError' || e.message==='Quota') text='端末の保存容量が足りません。空き容量を確認してください。';
+      else if(e.name==='SecurityError') text='このブラウザでは保存領域を利用できません。Safariの通常のタブで開いてください。';
+      else if(e.name==='NotAllowedError') text='端末認証が中止されたか、時間切れになりました。もう一度操作してください。';
+      else if(e.name==='OperationError') text='パスワードが違うか、暗号化データを読み取れませんでした。（OperationError）';
+      else if(/^Invalid/.test(e.message)) text='保存データまたはファイルの形式を読み取れませんでした。';
+      else if(/[\u3040-\u30ff\u3400-\u9fff]/.test(e.message)) text=e.message;
+      else text='処理に失敗しました。ブラウザを開き直してください。（'+(e.name||'Error')+'）';
+      message(text+' 保存データは消去していません。');$('panelMessage').textContent=text;
+    }
     finally{busy=false;$('app').inert=false;document.querySelectorAll('[data-vault-action]').forEach(b=>b.disabled=false);}
   }
   async function submit(event){
     event.preventDefault(); const p=$('vaultPassword').value, confirm=$('vaultConfirm').value, token=epoch;
-    $('vaultPassword').value=''; $('vaultConfirm').value='';
+    if(busy) return;
+    try {
+      if(localStorage.getItem(KEY)===null){
+        if(!passwordOK(p)){message('パスワードは12〜256文字で入力してください。');return;}
+        if(p!==confirm){message('2つのパスワードが一致していません。同じ内容を入力してください。');return;}
+      }
+    }catch(e){message('このブラウザでは保存領域を利用できません。Safariの通常のタブで開いてください。');return;}
+    message('処理中です。そのままお待ちください。');
     await run(async()=>{
       await queue;
       const raw=localStorage.getItem(KEY);
