@@ -146,13 +146,14 @@ function renderDelivery(){
           <div><div class="item-name">${escapeHtml(r.name)}</div><div class="small">予定 ${r.planned}</div></div>
           <div class="stepper">
             <button data-step="-1" data-recovery="${idx}" aria-label="減らす">−</button>
-            <input inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(r.actual)}" data-recovery-input="${idx}" aria-label="回収数" />
+            <input inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(r.actual??'')}" data-recovery-input="${idx}" aria-label="回収数" />
             <button data-step="1" data-recovery="${idx}" aria-label="増やす">＋</button>
           </div>
         </div>
       `).join('') : '<div class="small">回収予定なし</div>'}
     </section>
 
+    ${renderVisitDelivery(c)}
     <section class="panel">
       <h2>追加・変更</h2>
       <div class="toggle-grid">
@@ -200,6 +201,7 @@ function renderCheck(){
     </div>
 
     <button class="action-btn action-primary" style="width:100%; margin-top:12px" data-finish-day ${ready ? '' : 'disabled'}>本日の配達を終了</button>
+    ${renderVisitHistory()}
     <button class="reset-btn" data-reset>デモデータを初期化</button>
     <div class="small" style="margin-top:8px">登録内容・配達記録はこの端末内に保存されます。端末間の同期はありません。</div>
   `;
@@ -307,6 +309,7 @@ async function saveRouteForm(event){
 }
 
 function wireEvents(){
+  wireVisitHistory();
   wireCalendar();
   wireExcelImport();
   document.getElementById('routePickArea')?.addEventListener('click',()=>{
@@ -338,7 +341,8 @@ function wireEvents(){
     input.addEventListener('change', async () => {
       const c = getCurrentCustomer(); if (!c) return;
       const idx = Number(input.dataset.recoveryInput);
-      c.recovery[idx].actual = Math.max(0, Number(input.value || 0));
+      if(input.value.trim()!==''&&!/^\d+$/.test(input.value.trim())){alert('回収数は0以上の整数で入力してください。');return;}
+      c.recovery[idx].actual = input.value.trim()===''?null:Number(input.value);
       try { await saveState(); if(vaultUnlocked) render(); } catch(e) {}
     });
   });
@@ -358,7 +362,7 @@ function wireEvents(){
   const absentBtn = document.querySelector('[data-mark-absent]');
   if (absentBtn) absentBtn.addEventListener('click', () => markAndAdvance('absent'));
   const finish = document.querySelector('[data-finish-day]');
-  if (finish) finish.addEventListener('click', () => alert('本日の配達チェック完了です。\n（v0.2では記録の書き出しはまだ未実装です）'));
+  if (finish) finish.addEventListener('click', () => alert('本日の配達チェック完了です。\n日別の回収集計と訪問履歴を確認してください。'));
   const reset = document.querySelector('[data-reset]');
   if (reset) reset.addEventListener('click', resetDemo);
 
@@ -370,10 +374,7 @@ function sumItems(items){ return items.reduce((s,i) => s + Number(i.qty || 0), 0
 
 async function markAndAdvance(status){
   const c = getCurrentCustomer(); if (!c) return;
-  const noteInput = document.getElementById('noteInput');
-  if (noteInput) c.note = noteInput.value;
-  c.status = status;
-  try { await saveState(); } catch(e) { return; }
+  if(!await recordVisit(status)) return;
   if(!vaultUnlocked) return;
   const idx = state.customers.findIndex(x => x.id === c.id);
   const next = state.customers.slice(idx + 1).find(x => x.status === 'pending') || state.customers.find(x => x.status === 'pending');
@@ -419,10 +420,11 @@ DeliveryVault.init(data => {
   state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'calendar'; editingCustomerId=null;
   currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;
   if(resumeLocation?.customerId && state.customers.some(c=>c.id===resumeLocation.customerId)) currentCustomerId=resumeLocation.customerId;
-  resumeLocation=null;setScreen(currentScreen);
+  historyDate=activeVisitDate();historyArea='';resumeLocation=null;setScreen(currentScreen);
 }, () => {
   if(vaultUnlocked) resumeLocation={screen:['calendar','delivery','check','settings'].includes(currentScreen)?currentScreen:'list',customerId:currentCustomerId};
   clearExcelImport();
+  historyDate=calendarToday();historyArea='';
   vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
   document.getElementById('main').replaceChildren();
   document.getElementById('screenTitle').textContent='ロック中';

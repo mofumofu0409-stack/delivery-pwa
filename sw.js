@@ -1,10 +1,11 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.4.5-week-column1';
+const CACHE = CACHE_PREFIX + 'v0.5.0-visit-history1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './history.js',
   './calendar.js',
   './calendar.css',
   './excel-import.js',

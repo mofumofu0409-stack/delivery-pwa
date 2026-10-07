@@ -45,3 +45,13 @@
 .calendar-day.sunday,.calendar-day.holiday{background:#fff0f4;}
 .calendar-day.sunday.outside,.calendar-day.holiday.outside{background:#faf1f4;}
 .calendar-weekday.sunday{background:#fff0f4;}
+
+.visit-history label,.visit-receipt label{display:block;margin:10px 0;}
+.visit-history input,.visit-history select,.visit-receipt input{width:100%;min-height:44px;box-sizing:border-box;}
+.visit-confirm{display:flex;align-items:center;gap:8px;margin:16px 0;}
+.visit-confirm input{width:24px;height:24px;}
+.visit-table-wrap{overflow-x:auto;}
+.visit-table{border-collapse:collapse;width:100%;font-size:14px;}
+.visit-table th,.visit-table td{padding:10px 6px;border-bottom:1px solid var(--line);text-align:left;}
+.visit-table small{display:block;color:var(--muted);}
+.visit-history details{border-top:1px solid var(--line);padding:12px 0;}
