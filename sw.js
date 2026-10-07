@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.4.4-week-labels1';
+const CACHE = CACHE_PREFIX + 'v0.4.5-week-column1';
 const ASSETS = [
   './',
   './index.html',

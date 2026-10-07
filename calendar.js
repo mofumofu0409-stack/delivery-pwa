@@ -48,8 +48,8 @@ function renderCalendar(){
   const title=calendarMode==='month'?`${year}年${month+1}月`:`${calendarKey(start).slice(5).replace('-','/')}〜${calendarKey(start+6).slice(5).replace('-','/')}`;
   const cells=Array.from({length:days},(_,i)=>{
     const key=calendarKey(start+i),d=new Date((start+i)*86400000),plans=calendarPlans(key),selected=key===calendarSelected,holiday=calendarHoliday(key);
-    return `<button type="button" class="calendar-day ${holiday?'holiday':''} ${calendarMode==='month'&&d.getUTCMonth()!==month?'outside':''} ${selected?'selected':''} ${key===today?'today':''}" data-calendar-day="${key}" aria-label="${key} ${calendarWeek(key)}週 ${holiday?holiday+' ':''}${plans.map(p=>p.label).join('、')||'予定なし'}" aria-pressed="${selected}">
-      <span class="calendar-date">${d.getUTCDate()}${calendarMode==='week'?`<small>${weekday[d.getUTCDay()]}曜</small>`:''}${calendarMode==='month'&&d.getUTCDay()===0?`<small class="calendar-week-label">${calendarWeek(key)}週</small>`:''}${holiday?`<small class="calendar-holiday">${calendarMode==='week'?holiday:'祝'}</small>`:''}</span>
+    return `${calendarMode==='month'&&i%7===0?`<div class="calendar-week-column" aria-label="${calendarWeek(key)}週">${calendarWeek(key)}</div>`:''}<button type="button" class="calendar-day ${d.getUTCDay()===0?'sunday':''} ${holiday?'holiday':''} ${calendarMode==='month'&&d.getUTCMonth()!==month?'outside':''} ${selected?'selected':''} ${key===today?'today':''}" data-calendar-day="${key}" aria-label="${key} ${calendarWeek(key)}週 ${holiday?holiday+' ':''}${plans.map(p=>p.label).join('、')||'予定なし'}" aria-pressed="${selected}">
+      <span class="calendar-date">${d.getUTCDate()}${calendarMode==='week'?`<small>${weekday[d.getUTCDay()]}曜</small>`:''}${holiday?`<small class="calendar-holiday">${calendarMode==='week'?holiday:'祝'}</small>`:''}</span>
       <span class="calendar-events">${plans.slice(0,calendarMode==='month'?3:500).map(p=>`<span class="calendar-event">${escapeHtml(p.label)}${calendarMode==='week'?`<small>${escapeHtml(p.route.name)}・${p.customers.length}件</small>`:''}</span>`).join('')}${plans.length>3&&calendarMode==='month'?`<small>ほか${plans.length-3}ルート</small>`:''}${!plans.length&&calendarMode==='week'?'<small>予定なし</small>':''}</span>
     </button>`;
   }).join('');
@@ -57,7 +57,7 @@ function renderCalendar(){
   return `<section class="calendar-view"><div class="calendar-toolbar"><button data-calendar-shift="-1" aria-label="前の${calendarMode==='month'?'月':'週'}">‹</button><h2>${title}${calendarMode==='week'?` <small class="calendar-range-week">${calendarWeek(calendarKey(start))}週</small>`:''}</h2><button data-calendar-shift="1" aria-label="次の${calendarMode==='month'?'月':'週'}">›</button><button id="calendarToday">今日</button></div>
     ${renderCalendarSwitcher(calendarMode)}
     ${calendarMode==='week'?'<p class="calendar-swipe-hint">← 左右にスワイプして1週間を確認 →</p>':''}
-    <div class="calendar-${calendarMode}" ${calendarMode==='week'?'tabindex="0" aria-label="1週間の予定。左右にスクロールできます"':''}>${calendarMode==='month'?weekday.map(d=>`<div class="calendar-weekday">${d}</div>`).join(''):''}${cells}</div>
+    <div class="calendar-${calendarMode}" ${calendarMode==='week'?'tabindex="0" aria-label="1週間の予定。左右にスクロールできます"':''}>${calendarMode==='month'?'<div class="calendar-week-column calendar-week-column-heading">週</div>'+weekday.map((d,i)=>`<div class="calendar-weekday ${i===0?'sunday':''}">${d}</div>`).join(''):''}${cells}</div>
     <p class="small">町名は顧客の「地区」から表示します。未分類ならルート名を表示します。写真の対象期間：2026年4月〜2027年3月。祝日も通常予定を表示します。</p>
     <section class="calendar-detail"><h3>${calendarSelected.replaceAll('-','/')}（${calendarWeek(calendarSelected)}週）の配達先</h3>
     ${!calendarWithinPhoto(calendarSelected)?'<p class="calendar-notice">写真の対象期間外です。A〜D週は基準日からの推計です。次年度のカレンダーで確認してください。</p>':''}
