@@ -8,3 +8,17 @@
 .vault-card button:disabled { opacity: .6; }
 .vault-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 8px; }
 #vaultMessage, #panelMessage { color: #9c3414; }
+
+.bottom-nav { grid-template-columns: repeat(4, minmax(0,1fr)); }
+#vaultPanel { margin: 16px 20px; }
+#vaultFallback { margin: 8px 0 16px; background: white; color: #0f766e; }
+.route-settings { background: white; padding: 18px; border-radius: 16px; }
+.route-settings label { display: block; margin: 10px 0; }
+.route-settings input:not([type=checkbox]), .route-settings select { width: 100%; padding: 10px; border: 1px solid #9ca3af; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+.route-customer { display: grid; grid-template-columns: 24px minmax(0,1fr) 76px; gap: 8px; padding: 12px 0; border-bottom: 1px solid #ddd; align-items: center; }
+.route-customer label { margin: 0; }
+.route-customer small { display: block; color: #64748b; }
+.route-customer input[type=checkbox] { width: 22px; height: 22px; }
+.route-settings button { background: #0f766e; color: white; border: 0; padding: 14px; border-radius: 8px; font-size: 16px; margin-top: 14px; }
+
+#vaultPanel summary { cursor: pointer; padding: 14px 0; font-weight: 700; }

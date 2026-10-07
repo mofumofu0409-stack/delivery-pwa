@@ -28,6 +28,8 @@
   <section id="vaultGate" class="vault-card" aria-label="アプリのロック">
     <h1 id="vaultHeading">顧客データの暗号化を設定</h1>
     <p id="vaultHelp"></p>
+    <button id="vaultBio" type="button" data-vault-action hidden>生体認証で解除</button>
+    <button id="vaultFallback" type="button" hidden>パスワードで解除</button>
     <form id="vaultForm">
       <label>アプリのパスワード（12文字以上）<input id="vaultPassword" type="password" autocomplete="off" maxlength="256" required /></label>
       <label id="vaultConfirmLabel">パスワードを再入力<input id="vaultConfirm" type="password" autocomplete="off" maxlength="256" /></label>
@@ -38,17 +40,28 @@
     <button id="vaultReset" type="button" data-vault-action hidden>保存データを消してやり直す</button>
     <p id="vaultResetHelp" hidden>パスワードを忘れた場合に、この端末の顧客情報・配達記録・アプリの認証設定を消去して再設定します。元に戻せません。保存したバックアップファイルや他のアプリには触れません。</p>
   </section>
-  <div id="vaultTools" class="vault-tools" hidden>
-    <span id="vaultStatus" role="status"></span>
-    <button id="vaultSettings" type="button">保護・バックアップ</button>
-    <button id="vaultLock" type="button">ロック</button>
-  </div>
+  <div id="vaultTools" hidden></div>
+  <div id="app" class="app-shell" hidden>
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">定期配達サポート</div>
+        <h1 id="screenTitle">今日の配達</h1>
+      </div>
+      <div id="topCount" class="count-badge">残り 0件</div>
+    </header>
+
+
   <section id="vaultPanel" class="vault-card" hidden aria-label="保護とバックアップ">
     <h2>保護・バックアップ</h2>
+    <p id="vaultStatus" role="status"></p>
+    <details><summary>認証・ロック</summary>
+    <button id="vaultLock" type="button">今すぐロック</button>
     <p id="passkeyState"></p>
     <p>2分間操作がないとロックします。別のアプリやタブへ移動した場合もロックします。ナビから戻ったら再解除してください。</p>
     <button id="passkeySetup" type="button" data-vault-action>パスキーを追加（対応端末）</button>
-    <p>登録後はパスワードとパスキーの両方が必要です。Face ID・Touch ID・端末パスコードのどれを使うかは端末が決めます。登録が非対応・中止ならパスワード方式を維持します。先にバックアップを作成してください。</p>
+    <p>登録後は生体認証を優先し、使えない場合はパスワードで解除できます。Face ID・Touch ID・端末パスコードのどれを使うかは端末が決めます。登録が非対応・中止ならパスワード方式を維持します。先にバックアップを作成してください。</p>
+    </details>
+    <details><summary>バックアップ・復元</summary>
     <h3>暗号化バックアップを作成</h3>
     <form id="backupForm">
       <label>バックアップ専用パスワード（12文字以上）<input id="backupPassword" type="password" autocomplete="new-password" maxlength="256" required /></label>
@@ -63,19 +76,11 @@
       <button type="submit" data-vault-action>確認して復元</button>
     </form>
     <p>復元は現在の顧客データを置き換えます。先に現在のデータをバックアップしてください。新しい端末では、先にアプリの暗号化設定を行います。</p>
+    </details>
     <p id="panelMessage" role="status"></p>
-    <button id="vaultClosePanel" type="button">閉じる</button>
   </section>
-  <div id="app" class="app-shell" hidden>
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">定期配達サポート</div>
-        <h1 id="screenTitle">今日の配達</h1>
-      </div>
-      <div id="topCount" class="count-badge">残り 0件</div>
-    </header>
-
     <main id="main" class="main"></main>
+
 
     <nav class="bottom-nav" aria-label="メインメニュー">
       <button class="nav-btn active" data-screen="list" aria-label="一覧">
@@ -86,6 +91,9 @@
       </button>
       <button class="nav-btn" data-screen="check" aria-label="確認">
         <span class="nav-icon">✓</span><span>確認</span>
+      </button>
+      <button class="nav-btn" data-screen="settings" aria-label="設定">
+        <span class="nav-icon">⚙</span><span>設定</span>
       </button>
     </nav>
   </div>

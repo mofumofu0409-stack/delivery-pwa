@@ -18,6 +18,8 @@ let state = {customers:[]};
 let vaultUnlocked = false;
 let currentScreen = 'list';
 let editingCustomerId = null;
+let selectedRouteId='';
+let resumeLocation=null;
 let currentCustomerId = state.customers.find(c => c.status === 'pending')?.id || state.customers[0]?.id;
 
 function clone(v){ return JSON.parse(JSON.stringify(v)); }
@@ -43,6 +45,10 @@ function getCounts(){
 }
 
 function setScreen(screen){
+  if(currentScreen==='settings' && screen!=='settings'){
+    for(const id of ['backupPassword','backupConfirm','restorePassword']) document.getElementById(id).value='';
+    document.getElementById('restoreFile').value='';
+  }
   currentScreen = screen;
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.screen === screen));
   render();
@@ -58,7 +64,7 @@ function render(){
   }
   const counts = getCounts();
   document.getElementById('topCount').textContent = `残り ${counts.pending}件`;
-  const title = currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
+  const title = currentScreen === 'settings' ? '設定' : currentScreen === 'customer' ? (editingCustomerId ? '顧客を編集' : '顧客を登録') : currentScreen === 'list' ? '今日の配達' : currentScreen === 'delivery' ? '配達' : '最終チェック';
   document.getElementById('screenTitle').textContent = title;
 
   const main = document.getElementById('main');
@@ -66,6 +72,8 @@ function render(){
   if (currentScreen === 'delivery') main.innerHTML = renderDelivery();
   if (currentScreen === 'check') main.innerHTML = renderCheck();
   if (currentScreen === 'customer') main.innerHTML = renderCustomerForm();
+  if (currentScreen === 'settings') main.innerHTML = renderRouteSettings();
+  document.getElementById('vaultPanel').hidden = currentScreen !== 'settings';
   wireEvents();
 }
 
@@ -243,7 +251,66 @@ async function saveCustomerForm(event){
   setScreen('delivery');
 }
 
+function renderRouteSettings(){
+  const routes=state.routes || [], route=routes.find(r=>r.id===selectedRouteId);
+  if(!route) selectedRouteId='';
+  const days=['日','月','火','水','木','金','土'];
+  const assigned=state.customers.filter(c=>c.schedule).length;
+  return `<section class="route-settings">
+    <h2>配達予定の設定</h2>
+    <p>ルートごとにA〜D週・曜日を設定し、顧客をまとめて登録します。設定済み ${assigned}件／未設定 ${state.customers.length-assigned}件</p>
+    <label>編集するルート<select id="routeSelect"><option value="">新しいルートを作成</option>${routes.map(r=>`<option value="${escapeHtml(r.id)}" ${r.id===selectedRouteId?'selected':''}>${escapeHtml(r.name)}（${r.week}週・${days[r.weekday]}曜）</option>`).join('')}</select></label>
+    <form id="routeForm">
+      <label>ルート名<input name="routeName" maxlength="80" value="${escapeHtml(route?.name || '')}" placeholder="例：今市ルート" required /></label>
+      <label>配達週<select name="routeWeek">${['A','B','C','D'].map(w=>`<option value="${w}" ${route?.week===w?'selected':''}>${w}週</option>`).join('')}</select></label>
+      <label>曜日<select name="routeWeekday">${days.map((d,i)=>`<option value="${i}" ${(route?.weekday ?? 1)===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>
+      <label>地区からまとめて選択<select id="routeArea"><option value="">地区を選ぶ</option>${[...new Set(state.customers.map(c=>c.area))].map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select></label>
+      <button type="button" id="routePickArea">地区の顧客を選択して順番を振る</button>
+      <p>配達する顧客にチェックを入れ、順番を指定してください。選択した顧客はこのルートへ移動します。チェックを外した既存メンバーは未設定になります。</p>
+      ${state.customers.map((c,i)=>{
+        const member=!!route && c.schedule?.routeId===route.id, assignedRoute=routes.find(r=>r.id===c.schedule?.routeId);
+        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''} /><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name || '未設定')}</small></label><input type="number" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順" /></div>`;
+      }).join('')}
+      <button type="submit">${route?'ルートと配達順を保存':'ルートを登録'}</button>
+    </form>
+    <p id="routeMessage" role="status"></p>
+    <p>日付からのA〜D週判定と祝日変更は、カレンダーの基準設定後に追加します。</p>
+    ${routes.map(r=>`<details><summary>${escapeHtml(r.name)}：${r.week}週・${days[r.weekday]}曜</summary><ol>${state.customers.filter(c=>c.schedule?.routeId===r.id).sort((a,b)=>a.schedule.order-b.schedule.order).map(c=>`<li value="${c.schedule.order}">${escapeHtml(c.name)}（${escapeHtml(c.area)}）</li>`).join('')}</ol></details>`).join('')}
+  </section>`;
+}
+
+async function saveRouteForm(event){
+  event.preventDefault(); if(!vaultUnlocked)return;
+  const form=event.currentTarget, name=form.elements.routeName.value.trim(),week=form.elements.routeWeek.value,weekday=Number(form.elements.routeWeekday.value);
+  const message=document.getElementById('routeMessage');
+  if(!name||name.length>80||!['A','B','C','D'].includes(week)||!Number.isInteger(weekday)||weekday<0||weekday>6){message.textContent='ルート名・週・曜日を確認してください。';return;}
+  const next=clone(state);next.routes ||= [];
+  const id=selectedRouteId || 'R-'+crypto.randomUUID();
+  if(selectedRouteId&&!next.routes.some(r=>r.id===id)){message.textContent='編集対象が見つかりません。';return;}
+  const route={id,name,week,weekday};
+  const index=next.routes.findIndex(r=>r.id===id);if(index<0)next.routes.push(route);else next.routes[index]=route;
+  const members=[...document.querySelectorAll('[data-route-member]')], orders=[...document.querySelectorAll('[data-route-order]')];
+  for(const c of next.customers){
+    const checked=members.find(el=>el.dataset.routeMember===c.id)?.checked;
+    if(checked){c.schedule={routeId:id,order:Number(orders.find(el=>el.dataset.routeOrder===c.id)?.value)};}
+    else if(c.schedule?.routeId===id)delete c.schedule;
+  }
+  if(!DeliverySecurity.validState(next)){message.textContent='配達順は1〜5000の整数にし、同じルート内で重複させないでください。ルートは最大500件です。';return;}
+  try{await DeliveryVault.save(next);}catch(e){message.textContent='保存できませんでした。以前の配達予定は残っています。';return;}
+  if(!vaultUnlocked)return;
+  state=next;selectedRouteId=id;render();document.getElementById('routeMessage').textContent='配達予定を暗号化して保存しました。';
+}
+
 function wireEvents(){
+  document.getElementById('routePickArea')?.addEventListener('click',()=>{
+    const area=document.getElementById('routeArea').value;if(!area)return;
+    const members=[...document.querySelectorAll('[data-route-member]')],orders=[...document.querySelectorAll('[data-route-order]')];let order=0;
+    for(const el of members){if(state.customers.find(c=>c.id===el.dataset.routeMember)?.area===area)el.checked=true;if(el.checked){const input=orders.find(x=>x.dataset.routeOrder===el.dataset.routeMember);if(input)input.value=String(++order);}}
+    document.getElementById('routeMessage').textContent='地区の顧客を選択しました。選択した顧客の順番を上から振り直しました。保存で確定します。';
+  });
+  document.getElementById('routeSelect')?.addEventListener('change',event=>{selectedRouteId=event.target.value;render();});
+  document.getElementById('routeForm')?.addEventListener('submit',saveRouteForm);
+
   document.querySelector('[data-add-customer]')?.addEventListener('click', () => openCustomerForm());
   document.querySelector('[data-edit-customer]')?.addEventListener('click', () => openCustomerForm(currentCustomerId));
   document.getElementById('customerForm')?.addEventListener('submit', saveCustomerForm);
@@ -325,7 +392,7 @@ function showFiltered(type){
 
 async function resetDemo(){
   if (!confirm('登録した顧客・編集した住所は残し、未編集のデモデータを初期状態に戻しますか？')) return;
-  const retained = state.customers.filter(c => c.registered || c.customized);
+  const retained = state.customers.filter(c => c.registered || c.customized || c.schedule);
   const customers = clone(demoCustomers).map(c => retained.find(x => x.id === c.id) || c);
   customers.push(...retained.filter(c => !customers.some(x => x.id === c.id)));
   const next = { ...state, customers };
@@ -342,10 +409,12 @@ function escapeHtml(value=''){
 
 document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {if(vaultUnlocked)setScreen(btn.dataset.screen);}));
 DeliveryVault.init(data => {
-  state=data; vaultUnlocked=true; storageBlocked=false; currentScreen='list'; editingCustomerId=null;
+  state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'list'; editingCustomerId=null;
   currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;
-  setScreen('list');
+  if(resumeLocation?.customerId && state.customers.some(c=>c.id===resumeLocation.customerId)) currentCustomerId=resumeLocation.customerId;
+  resumeLocation=null;setScreen(currentScreen);
 }, () => {
+  if(vaultUnlocked) resumeLocation={screen:['delivery','check','settings'].includes(currentScreen)?currentScreen:'list',customerId:currentCustomerId};
   vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
   document.getElementById('main').replaceChildren();
   document.getElementById('screenTitle').textContent='ロック中';

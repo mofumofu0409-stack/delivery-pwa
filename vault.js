@@ -27,6 +27,8 @@
     if(v.kdf?.name !== 'PBKDF2-SHA256' || v.kdf.iterations !== 600000 || bytes(v.kdf.salt).length !== 16) throw Error('Invalid KDF');
     for(const box of [v.wrapped,v.payload]) if(!box || bytes(box.iv).length !== 12 || bytes(box.data).length < 16) throw Error('Invalid ciphertext');
     if(v.biometric && (bytes(v.biometric.id).length < 1 || bytes(v.biometric.salt).length !== 32)) throw Error('Invalid passkey');
+    if(v.biometric?.mode!==undefined && v.biometric.mode!=='alternative') throw Error('Invalid passkey mode');
+    if(v.biometric?.mode==='alternative' && (!v.biometric.box || bytes(v.biometric.box.iv).length!==12 || bytes(v.biometric.box.data).length<16)) throw Error('Invalid passkey wrapper');
     return v;
   }
   async function make(data,password){
@@ -48,13 +50,22 @@
   async function decrypt(v,password){
     const kek=await passwordKey(password,v.kdf);
     let raw=await open(kek,v.wrapped,v.id+'password');
-    if(v.biometric){
+    let bioKey=null;
+    if(v.biometric && v.biometric.mode!=='alternative'){
       const box=JSON.parse(dec.decode(raw));
-      raw=await open(await passkeyKey(v.biometric),box,v.id+'passkey');
+      bioKey=await passkeyKey(v.biometric);
+      raw=await open(bioKey,box,v.id+'passkey');
     }
     const key=await aes(raw); new Uint8Array(raw).fill(0);
     const data=DeliverySecurity.parseState(dec.decode(await open(key,v.payload,v.id+'data')));
-    return {key,kek,data};
+    return {key,kek,data,bioKey};
+  }
+  async function decryptBiometric(v){
+    if(v.biometric?.mode!=='alternative') throw Error('最初の1回はパスワードで解除してください。');
+    const raw=await open(await passkeyKey(v.biometric),v.biometric.box,v.id+'passkey');
+    const key=await aes(raw);new Uint8Array(raw).fill(0);
+    const data=DeliverySecurity.parseState(dec.decode(await open(key,v.payload,v.id+'data')));
+    return {key,kek:null,data};
   }
   let session=null, queue=Promise.resolve(), pending=0, lastActivity=Date.now(), startCallback, lockCallback;
   let epoch=0, busy=false, channel=null;
@@ -73,12 +84,15 @@
     $('vaultGate').hidden=false; $('app').hidden=true; $('vaultTools').hidden=true;
     $('vaultPassword').value=''; $('vaultConfirm').value='';
     const exists=localStorage.getItem(KEY)!==null;
+    let biometric=false,legacyBiometric=false;
+    if(exists){try{const v=parse(localStorage.getItem(KEY));biometric=v.biometric?.mode==='alternative';legacyBiometric=!!v.biometric&&!biometric;}catch(e){}}
+    $('vaultBio').hidden=!biometric; $('vaultFallback').hidden=!biometric; $('vaultForm').hidden=biometric;
     const resetAvailable=exists || localStorage.getItem(LEGACY)!==null;
     $('vaultReset').hidden=!resetAvailable; $('vaultResetHelp').hidden=!resetAvailable;
     $('vaultHeading').textContent=exists?'配達アプリをロック解除':'顧客データの暗号化を設定';
     $('vaultConfirmLabel').hidden=exists;
     $('vaultSubmit').textContent=exists?'ロック解除':'暗号化して開始';
-    $('vaultHelp').textContent=exists?'アプリのパスワードを入力してください。パスキー登録済みなら、その後に端末認証が必要です。':'パスワードは12文字以上で登録してください。忘れると復元できません。既存データは確認してから暗号化し、元の平文保存を消去します。';
+    $('vaultHelp').textContent=biometric?'生体認証で解除できます。使えない場合は「パスワードで解除」を選んでください。':exists?(legacyBiometric?'更新後の最初の1回はパスワードと端末認証が必要です。成功後は生体認証だけで解除できます。':'アプリのパスワードを入力してください。'):'パスワードは12文字以上で登録してください。忘れると復元できません。既存データは確認してから暗号化し、元の平文保存を消去します。';
   }
   function lock(){
     epoch++; session=null;
@@ -88,9 +102,9 @@
   }
   function activate(s,data){
     session=s; lastActivity=Date.now();
-    $('vaultGate').hidden=true; $('app').hidden=false; $('vaultTools').hidden=false;
+    $('vaultGate').hidden=true; $('app').hidden=false; $('vaultTools').hidden=true;
     $('vaultPassword').value=''; $('vaultConfirm').value='';
-    $('passkeySetup').hidden=!!s.v.biometric; $('passkeyState').textContent=s.v.biometric?'パスワード＋パスキー認証':'パスワード認証（パスキー未設定）';
+    $('passkeySetup').hidden=!!s.v.biometric; $('passkeyState').textContent=s.v.biometric?.mode==='alternative'?'生体認証優先／パスワードでも解除できます':s.v.biometric?'旧方式：パスワード＋パスキー認証':'パスワード認証（パスキー未設定）';
     status(); startCallback(data);
   }
   function save(data){
@@ -135,11 +149,20 @@
       await queue;
       const raw=localStorage.getItem(KEY);
       if(raw!==null){
-        const v=parse(raw), unlocked=await decrypt(v,p);
+        let v=parse(raw); const unlocked=await decrypt(v,p); let activeRaw=raw;
         if(token!==epoch || document.hidden) return;
         if(localStorage.getItem(KEY)!==raw) throw Error('保存内容が変更されました。もう一度解除してください。');
+        if(unlocked.bioKey){
+          const rawKey=await crypto.subtle.exportKey('raw',unlocked.key);
+          try{
+            const box=await seal(unlocked.bioKey,rawKey,v.id+'passkey');
+            const next={...v,revision:b64(random(16)),wrapped:await seal(unlocked.kek,rawKey,v.id+'password'),biometric:{...v.biometric,mode:'alternative',box}};
+            if(token!==epoch||document.hidden)return;
+            await storageLock(()=>{activeRaw=write(next,raw);});v=next;
+          }finally{new Uint8Array(rawKey).fill(0);}
+        }
         localStorage.removeItem(LEGACY);
-        activate({...unlocked,v,raw},unlocked.data);
+        activate({key:unlocked.key,kek:unlocked.kek,v,raw:activeRaw},unlocked.data);
       }else{
         if(!passwordOK(p)||p!==confirm) throw Error('同じ12〜256文字のパスワードを2回入力してください。');
         const old=localStorage.getItem(LEGACY), data=old===null?window.deliveryDemoState():DeliverySecurity.parseState(old);
@@ -156,6 +179,17 @@
         activate(created,data);
       }
     });
+  }
+  async function unlockBiometric(){
+    const token=epoch;
+    await run(async()=>{
+      await queue;const raw=localStorage.getItem(KEY),v=parse(raw);
+      const unlocked=await decryptBiometric(v);
+      if(token!==epoch||document.hidden)return;
+      if(localStorage.getItem(KEY)!==raw)throw Error('保存内容が変わりました。もう一度解除してください。');
+      activate({...unlocked,v,raw},unlocked.data);
+    });
+    if(!session){$('vaultForm').hidden=false;message('生体認証で解除できませんでした。もう一度試すか、パスワードで解除してください。');}
   }
   async function resetStorage(){
     if(session) return;
@@ -175,15 +209,15 @@
     if(!window.PublicKeyCredential || !navigator.credentials) throw Error('このブラウザはパスキーに対応していません。');
     const credential=await navigator.credentials.create({publicKey:{challenge:random(32),rp:{name:'配達サポート'},user:{id:random(32),name:'delivery-device',displayName:'配達サポート端末'},pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',residentKey:'required',userVerification:'required'},timeout:60000,extensions:{prf:{}}}});
     if(!credential) throw Error('登録を中止しました。');
-    const info={id:b64(credential.rawId),salt:b64(random(32))};
+    const info={id:b64(credential.rawId),salt:b64(random(32)),mode:'alternative'};
     const bioKey=await passkeyKey(info);
     const rawKey=await crypto.subtle.exportKey('raw',s.key);
     const box=await seal(bioKey,rawKey,s.v.id+'passkey'); new Uint8Array(rawKey).fill(0);
-    const v={...s.v,biometric:info,revision:b64(random(16)),wrapped:await seal(s.kek,enc.encode(JSON.stringify(box)),s.v.id+'password')};
+    const v={...s.v,biometric:{...info,box},revision:b64(random(16))};
     if(token!==epoch || session!==s || document.hidden) return;
     await storageLock(()=>{s.raw=write(v,s.raw);s.v=v;});
-    $('passkeySetup').hidden=true; $('passkeyState').textContent='パスワード＋パスキー認証';
-    $('panelMessage').textContent='登録しました。次回からパスワードと端末認証が必要です。';
+    $('passkeySetup').hidden=true; $('passkeyState').textContent='生体認証優先／パスワードでも解除できます';
+    $('panelMessage').textContent='登録しました。次回から生体認証で解除できます。使えない場合はパスワードでも解除できます。';
   }
   function download(v){
     const blob=new Blob([JSON.stringify(v)],{type:'application/json'}), url=URL.createObjectURL(blob), a=document.createElement('a');
@@ -193,10 +227,10 @@
     startCallback=onStart;lockCallback=onLock;
     if(!crypto?.subtle || !window.isSecureContext){message('HTTPSとWeb Cryptoに対応するブラウザが必要です。');$('vaultSubmit').disabled=true;return;}
     $('vaultForm').addEventListener('submit',submit);
+    $('vaultBio').addEventListener('click',unlockBiometric);
+    $('vaultFallback').addEventListener('click',()=>{$('vaultForm').hidden=false;message('アプリのパスワードを入力してください。');$('vaultPassword').focus();});
     $('vaultReset').addEventListener('click',()=>run(resetStorage));
     $('vaultLock').addEventListener('click',lock);
-    $('vaultSettings').addEventListener('click',()=>{$('vaultPanel').hidden=!$('vaultPanel').hidden;});
-    $('vaultClosePanel').addEventListener('click',()=>{$('vaultPanel').hidden=true;$('backupPassword').value='';$('backupConfirm').value='';});
     $('passkeySetup').addEventListener('click',()=>run(enroll));
     $('backupForm').addEventListener('submit',e=>{e.preventDefault();const p=$('backupPassword').value,c=$('backupConfirm').value; $('backupPassword').value='';$('backupConfirm').value='';return run(async()=>{
       await queue; const s=session,token=epoch;
@@ -226,5 +260,5 @@
     if(window.BroadcastChannel){channel=new BroadcastChannel('delivery-vault');channel.onmessage=()=>{if(session){lock();message('別の画面で保存されたためロックしました。');}};}
     try{showLock();}catch(e){message('保存領域を使用できません。');$('vaultSubmit').disabled=true;}
   }
-  window.DeliveryVault=Object.freeze({init,save,lock,passwordOK,parse,make,decrypt});
+  window.DeliveryVault=Object.freeze({init,save,lock,passwordOK,parse,make,decrypt,decryptBiometric});
 })();

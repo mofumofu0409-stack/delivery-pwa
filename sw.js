@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.2.6-password2';
+const CACHE = CACHE_PREFIX + 'v0.3.0-routes1';
 const ASSETS = [
   './',
   './index.html',

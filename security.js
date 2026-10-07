@@ -8,6 +8,15 @@
   }
   function validState(value) {
     if (!record(value) || !Array.isArray(value.customers) || value.customers.length > 5000) return false;
+    const routeIds=new Set();
+    if(value.routes!==undefined){
+      if(!Array.isArray(value.routes)||value.routes.length>500)return false;
+      for(const r of value.routes){
+        if(!record(r)||typeof r.id!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(r.id)||routeIds.has(r.id)||!text(r.name,80)||!r.name.trim()||!['A','B','C','D'].includes(r.week)||!Number.isInteger(r.weekday)||r.weekday<0||r.weekday>6)return false;
+        routeIds.add(r.id);
+      }
+    }
+    const routeOrders=new Set();
     const ids = new Set();
     return value.customers.every(c => {
       if (!record(c) || typeof c.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(c.id) || ids.has(c.id)) return false;
@@ -16,6 +25,11 @@
       if (!['pending', 'done', 'absent'].includes(c.status) || typeof c.added !== 'boolean' || typeof c.changed !== 'boolean') return false;
       if (c.registered !== undefined && typeof c.registered !== 'boolean') return false;
       if (c.customized !== undefined && typeof c.customized !== 'boolean') return false;
+      if(c.schedule!==undefined){
+        const s=c.schedule;
+        if(!record(s)||!routeIds.has(s.routeId)||!Number.isInteger(s.order)||s.order<1||s.order>5000)return false;
+        const key=s.routeId+':'+s.order;if(routeOrders.has(key))return false;routeOrders.add(key);
+      }
       if (!Array.isArray(c.items) || c.items.length > 200 || !Array.isArray(c.recovery) || c.recovery.length > 200) return false;
       return c.items.every(i => record(i) && text(i.name, 200) && quantity(i.qty)) &&
         c.recovery.every(r => record(r) && text(r.name, 200) && quantity(r.planned) && quantity(r.actual));
