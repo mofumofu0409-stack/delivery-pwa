@@ -33,3 +33,7 @@
 .calendar-detail li button{border:0;background:#f5f7f8;padding:12px;margin:4px 0;width:100%;text-align:left;border-radius:8px;}
 .calendar-settings{margin:16px 0;}
 @media(min-width:700px){.calendar-day{min-height:115px;padding:10px;}.calendar-event{font-size:14px;}}
+
+.calendar-day.holiday .calendar-date{color:#a13d20;}
+.calendar-date small.calendar-holiday{color:#a13d20;font-weight:700;}
+.calendar-notice{background:#fff4dc;border-left:3px solid #bd8118;padding:10px;color:#704b10;font-size:14px;}
