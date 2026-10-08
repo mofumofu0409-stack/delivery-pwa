@@ -1,0 +1,38 @@
+[hidden] { display: none !important; }
+.vault-card { max-width: 560px; margin: 20px auto; padding: 22px; background: white; border-radius: 16px; color: #123; }
+.vault-card h1 { font-size: 23px; }
+.vault-card p { line-height: 1.65; overflow-wrap: anywhere; }
+.vault-card label { display: block; margin: 14px 0; font-weight: 600; }
+.vault-card input { display: block; box-sizing: border-box; width: 100%; padding: 12px; margin-top: 6px; border: 1px solid #9ca3af; border-radius: 8px; font-size: 16px; }
+.vault-card button, .vault-tools button { padding: 12px; border: 1px solid #0f766e; border-radius: 8px; background: #0f766e; color: white; font-size: 16px; cursor: pointer; }
+.vault-card button:disabled { opacity: .6; }
+.vault-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 8px; }
+#vaultMessage, #panelMessage { color: #9c3414; }
+
+.bottom-nav { grid-template-columns: repeat(4, minmax(0,1fr)); }
+#vaultPanel { margin: 16px 20px; }
+#vaultFallback { margin: 8px 0 16px; background: white; color: #0f766e; }
+.route-settings { background: white; padding: 18px; border-radius: 16px; }
+.route-settings label { display: block; margin: 10px 0; }
+.route-settings input:not([type=checkbox]), .route-settings select { width: 100%; padding: 10px; border: 1px solid #9ca3af; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+.route-customer { display: grid; grid-template-columns: 24px minmax(0,1fr) 76px; gap: 8px; padding: 12px 0; border-bottom: 1px solid #ddd; align-items: center; }
+.route-customer label { margin: 0; }
+.route-customer small { display: block; color: #64748b; }
+.route-customer input[type=checkbox] { width: 22px; height: 22px; }
+.route-settings button { background: #0f766e; color: white; border: 0; padding: 14px; border-radius: 8px; font-size: 16px; margin-top: 14px; }
+
+#vaultPanel summary { cursor: pointer; padding: 14px 0; font-weight: 700; }
+
+.excel-settings {margin-bottom:20px;}
+.excel-settings>details>summary {font-size:1.15rem;font-weight:700;cursor:pointer;}
+.excel-columns {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.excel-columns label {min-width:0;}
+.excel-columns select {width:100%;}
+.excel-update {display:flex!important;gap:10px;align-items:flex-start;}
+.excel-update input {width:24px!important;flex:0 0 24px;}
+.excel-preview {max-height:420px;overflow:auto;border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin:16px 0;}
+.excel-preview article {border-bottom:1px solid #cbd5e1;padding:12px 0;overflow-wrap:anywhere;}
+.excel-preview p {margin:8px 0;}
+.excel-error {white-space:pre-wrap;color:#9a3412;overflow-wrap:anywhere;}
+.excel-item-meta {display:block;color:#64748b;font-size:0.8rem;font-weight:400;}
+@media(max-width:440px){.excel-columns{grid-template-columns:1fr;}}
