@@ -305,6 +305,9 @@ function renderRouteSettings(){
   const assigned=state.customers.filter(c=>c.schedule).length;
   return `<section class="route-settings">
     <h2>配達予定の設定</h2>
+    <h3>登録済みルート</h3>
+    ${routes.length?routes.map(r=>{const members=routeBaseCustomers(state,r.id),missing=members.filter(c=>!routePosition(c)).length;return `<section class="panel"><h3>${escapeHtml(r.name)}：${r.week}週・${days[r.weekday]}曜</h3><p>顧客 ${members.length}件／地図の位置未登録 ${missing}件</p><button type="button" data-saved-route-map="${escapeHtml(r.id)}">地図で顧客を見る</button><button type="button" data-saved-route-edit="${escapeHtml(r.id)}">内容を編集</button><details><summary>顧客一覧を見る</summary><ol>${members.map(c=>`<li>${escapeHtml(c.name)}（${escapeHtml(c.area)}）</li>`).join('')}</ol></details></section>`;}).join(''):'<p>まだルートが登録されていません。</p>'}
+    <h3 id="routeEditHeading">${route?'ルートを編集':'新しいルートを登録'}</h3>
     <p>ルートごとにA〜D週・曜日を設定し、顧客をまとめて登録します。設定済み ${assigned}件／未設定 ${state.customers.length-assigned}件</p>
     <label>編集するルート<select id="routeSelect"><option value="">新しいルートを作成</option>${routes.map(r=>`<option value="${escapeHtml(r.id)}" ${r.id===selectedRouteId?'selected':''}>${escapeHtml(r.name)}（${r.week}週・${days[r.weekday]}曜）</option>`).join('')}</select></label>
     <form id="routeForm">
@@ -334,7 +337,7 @@ function renderRouteSettings(){
     </form>
     <p id="routeMessage" role="status"></p>
     <p>登録した予定はカレンダーに表示します。祝日の振替は未対応です。</p>
-    ${routes.map(r=>`<details><summary>${escapeHtml(r.name)}：${r.week}週・${days[r.weekday]}曜</summary><ol>${state.customers.filter(c=>c.schedule?.routeId===r.id).sort((a,b)=>a.schedule.order-b.schedule.order).map(c=>`<li value="${c.schedule.order}">${escapeHtml(c.name)}（${escapeHtml(c.area)}）</li>`).join('')}</ol></details>`).join('')}
+
   </section>`;
 }
 
@@ -366,6 +369,8 @@ function syncRouteOrderRows(){
  const empty=document.getElementById('routeOrderEmpty');if(empty)empty.hidden=selected.size>0;
 }
 function wireEvents(){
+  document.querySelectorAll('[data-saved-route-map]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.savedRouteMap;selectedRouteId=id;routeSettingsDraft=null;routeOpenPlanner(id,'',routeBaseCustomers(state,id).map(c=>c.id));}));
+  document.querySelectorAll('[data-saved-route-edit]').forEach(b=>b.addEventListener('click',()=>{selectedRouteId=b.dataset.savedRouteEdit;routeSettingsDraft=null;render();document.getElementById('routeEditHeading')?.scrollIntoView({block:'start'});}));
   wireRoutePlanner();
   wireContract();
   wireVisitHistory();
