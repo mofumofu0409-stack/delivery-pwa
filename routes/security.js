@@ -13,6 +13,7 @@
   function recovery(value){return record(value)&&text(value.name,200)&&(value.model===undefined||text(value.model,100))&&quantity(value.planned)&&(value.actual===null||quantity(value.actual));}
   function validState(value) {
     if (!record(value) || !Array.isArray(value.customers) || value.customers.length > 5000) return false;
+    if(value.demoCleanup!==undefined){const d=value.demoCleanup;if(!record(d)||d.version!==1||!Array.isArray(d.customers)||d.customers.length>10||!validState({customers:d.customers}))return false;}
     if(value.calendar!==undefined){
       const base=value.calendar?.aWeekStart;
       if(!record(value.calendar)||typeof base!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(base)||base<'2000-01-01'||base>'2100-12-31')return false;

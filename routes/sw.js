@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.8.2-excellist1';
+const CACHE = CACHE_PREFIX + 'v0.8.3-democleanup1';
 const ASSETS = [
   './',
   './index.html',

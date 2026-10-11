@@ -27,7 +27,14 @@ async function saveState(){
   if (!vaultUnlocked || !DeliverySecurity.validState(state)) throw new Error('保存できる状態ではありません。');
   return DeliveryVault.save(state);
 }
-window.deliveryDemoState = () => ({customers:clone(demoCustomers)});
+window.deliveryDemoState = () => ({customers:[],demoCleanup:{version:1,customers:[]}});
+function withoutInitialDemo(data){
+  if(data.demoCleanup?.version===1)return data;
+  const stable=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
+  const removed=data.customers.filter(c=>demoCustomers.some(d=>stable(c)===stable(d))&&!data.routeDays?.some(day=>day.customerIds.includes(c.id)));
+  if(!removed.length)return data;
+  const next=clone(data),ids=new Set(removed.map(c=>c.id));next.customers=next.customers.filter(c=>!ids.has(c.id));next.demoCleanup={version:1,customers:clone(removed)};return next;
+}
 
 function statusLabel(status){
   return status === 'done' ? '完了' : status === 'absent' ? '不在' : '未配達';
@@ -425,6 +432,7 @@ function showFiltered(type){
 }
 
 async function resetDemo(){
+  if(state.demoCleanup?.version===1){alert('初期デモ顧客は削除済みです。登録済み顧客と記録は変更しません。');return;}
   if (!confirm('登録した顧客・編集した住所は残し、未編集のデモデータを初期状態に戻しますか？')) return;
   const retained = state.customers.filter(c => c.registered || c.customized || c.schedule || c.location || state.routeDays?.some(d=>d.customerIds.includes(c.id)));
   const customers = clone(demoCustomers).map(c => retained.find(x => x.id === c.id) || c);
@@ -442,8 +450,11 @@ function escapeHtml(value=''){
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {if(vaultUnlocked)setScreen(btn.dataset.screen);}));
-DeliveryVault.init(data => {
+DeliveryVault.init(async data => {
   state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'calendar'; editingCustomerId=null;
+  const cleaned=withoutInitialDemo(state);
+  if(cleaned!==state){try{await DeliveryVault.save(cleaned);if(!vaultUnlocked)return;state=cleaned;}catch(e){return;}}
+
   currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;
   if(resumeLocation?.customerId && state.customers.some(c=>c.id===resumeLocation.customerId)) currentCustomerId=resumeLocation.customerId;
   if(state.routeRun){const queue=routeRunCustomers();if(queue?.length){if(!queue.some(c=>c.id===resumeLocation?.customerId))currentCustomerId=queue.find(c=>c.status==='pending')?.id||queue[0].id;currentScreen='delivery';}}
