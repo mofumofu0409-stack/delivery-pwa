@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.8.7-routeflow1';
+const CACHE = CACHE_PREFIX + 'v0.8.8-routesteps1';
 const ASSETS = [
   './',
   './index.html',

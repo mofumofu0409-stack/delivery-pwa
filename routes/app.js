@@ -308,18 +308,28 @@ function renderRouteSettings(){
     <p>ルートごとにA〜D週・曜日を設定し、顧客をまとめて登録します。設定済み ${assigned}件／未設定 ${state.customers.length-assigned}件</p>
     <label>編集するルート<select id="routeSelect"><option value="">新しいルートを作成</option>${routes.map(r=>`<option value="${escapeHtml(r.id)}" ${r.id===selectedRouteId?'selected':''}>${escapeHtml(r.name)}（${r.week}週・${days[r.weekday]}曜）</option>`).join('')}</select></label>
     <form id="routeForm">
-      <label>ルート名<input name="routeName" maxlength="80" value="${escapeHtml(draft?.name ?? route?.name ?? '')}" placeholder="例：今市ルート" required /></label>
-      <label>配達週<select name="routeWeek">${['A','B','C','D'].map(w=>`<option value="${w}" ${(draft?.week??route?.week)===w?'selected':''}>${w}週</option>`).join('')}</select></label>
-      <label>曜日<select name="routeWeekday">${days.map((d,i)=>`<option value="${i}" ${(draft?.weekday ?? route?.weekday ?? 1)===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>
-      <label>地区からまとめて選択<select id="routeArea"><option value="">地区を選ぶ</option>${[...new Set(state.customers.map(c=>c.area))].map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select></label>
-      <button type="button" id="routePickArea">地区の顧客を選択して順番を振る</button>
-      <p>配達する顧客にチェックを入れ、順番を指定してください。選択した顧客はこのルートへ移動します。チェックを外した既存メンバーは未設定になります。</p>
+      <h3>1. 地区を選ぶ</h3>
+      <label>地区<select id="routeArea"><option value="">地区を選ぶ</option>${[...new Set(state.customers.map(c=>c.area))].map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select></label>
+      <button type="button" id="routePickArea">この地区の顧客をまとめて選択</button>
+      <h3>2. 配達する顧客を選ぶ</h3>
+      <p>配達する人にチェックを入れてください。不要な人は外せます。</p>
       ${state.customers.map((c,i)=>{
-        const member=draft?draft.order.includes(c.id):!!route && c.schedule?.routeId===route.id, assignedRoute=routes.find(r=>r.id===c.schedule?.routeId);
-        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''} /><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name || '未設定')}</small></label><input type="number" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${draft&&member?draft.order.indexOf(c.id)+1:member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順" /></div>`;
+        const member=draft?draft.order.includes(c.id):!!route&&c.schedule?.routeId===route.id,assignedRoute=routes.find(r=>r.id===c.schedule?.routeId);
+        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''}><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name||'未設定')}</small></label></div>`;
       }).join('')}
+      <h3>3. ルート名を入力</h3>
+      <label>ルート名<input name="routeName" maxlength="80" value="${escapeHtml(draft?.name??route?.name??'')}" placeholder="例：七里" required></label>
+      <h3>4. 配達する週・曜日を選ぶ</h3>
+      <label>配達週<select name="routeWeek">${['A','B','C','D'].map(w=>`<option value="${w}" ${(draft?.week??route?.week)===w?'selected':''}>${w}週</option>`).join('')}</select></label>
+      <label>曜日<select name="routeWeekday">${days.map((d,i)=>`<option value="${i}" ${(draft?.weekday??route?.weekday??1)===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>
+      <h3>5. 訪問順を決める</h3>
+      <p>選んだ顧客の番号を変更するか、地図で訪問順を決めてください。</p>
+      <p id="routeOrderEmpty" ${state.customers.some(c=>draft?draft.order.includes(c.id):c.schedule?.routeId===route?.id&&!!route)?'hidden':''}>顧客を選ぶと、ここに表示されます。</p>
+      ${state.customers.map((c,i)=>{const member=draft?draft.order.includes(c.id):!!route&&c.schedule?.routeId===route.id;return `<div class="route-customer" data-route-order-row="${escapeHtml(c.id)}" ${member?'':'hidden'}><label>${escapeHtml(c.name)}<input type="number" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${draft&&member?draft.order.indexOf(c.id)+1:member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順"></label></div>`;}).join('')}
       <button type="button" id="routeOpenMap">地図で訪問順を決める</button>
       <p class="small">地図は必要な場合だけ使えます。最後に下のボタンで登録してください。</p>
+      <h3>6. 登録する</h3>
+      <p class="small">登録すると、選んだ顧客をこのルートへ移動します。編集時にチェックを外した顧客は、このルートの予定から外れます。</p>
       <button type="submit">${route?'ルートと配達順を保存':'ルートを登録'}</button>
     </form>
     <p id="routeMessage" role="status"></p>
@@ -350,6 +360,11 @@ async function saveRouteForm(event){
   state=next;selectedRouteId=id;routeSettingsDraft=null;render();document.getElementById('routeMessage').textContent='配達予定を暗号化して保存しました。';
 }
 
+function syncRouteOrderRows(){
+ const selected=new Set([...document.querySelectorAll('[data-route-member]')].filter(el=>el.checked).map(el=>el.dataset.routeMember));
+ document.querySelectorAll('[data-route-order-row]').forEach(el=>el.hidden=!selected.has(el.dataset.routeOrderRow));
+ const empty=document.getElementById('routeOrderEmpty');if(empty)empty.hidden=selected.size>0;
+}
 function wireEvents(){
   wireRoutePlanner();
   wireContract();
@@ -360,10 +375,11 @@ function wireEvents(){
   document.getElementById('routeOpenMap')?.addEventListener('click',routeOpenSettingsMap);
   document.getElementById('routePickArea')?.addEventListener('click',()=>{
     const area=document.getElementById('routeArea').value;if(!area)return;
-    const members=[...document.querySelectorAll('[data-route-member]')],orders=[...document.querySelectorAll('[data-route-order]')];let order=0;
-    for(const el of members){if(state.customers.find(c=>c.id===el.dataset.routeMember)?.area===area)el.checked=true;if(el.checked){const input=orders.find(x=>x.dataset.routeOrder===el.dataset.routeMember);if(input)input.value=String(++order);}}
-    document.getElementById('routeMessage').textContent='地区の顧客を選択しました。選択した顧客の順番を上から振り直しました。保存で確定します。';
+    for(const el of document.querySelectorAll('[data-route-member]')){if(state.customers.find(c=>c.id===el.dataset.routeMember)?.area===area)el.checked=true;}
+    syncRouteOrderRows();
+    document.getElementById('routeMessage').textContent='地区の顧客を選択しました。次にルート名・週・曜日を設定してください。まだ登録されていません。';
   });
+  document.querySelectorAll('[data-route-member]').forEach(el=>el.addEventListener?.('change',syncRouteOrderRows));
   document.getElementById('routeSelect')?.addEventListener('change',event=>{selectedRouteId=event.target.value;routeSettingsDraft=null;render();});
   document.getElementById('routeForm')?.addEventListener('submit',saveRouteForm);
 
