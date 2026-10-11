@@ -14,6 +14,7 @@
   function validState(value) {
     if (!record(value) || !Array.isArray(value.customers) || value.customers.length > 5000) return false;
     if(value.demoCleanup!==undefined){const d=value.demoCleanup;if(!record(d)||d.version!==1||!Array.isArray(d.customers)||d.customers.length>10||!validState({customers:d.customers}))return false;}
+    if(value.demoCleanup?.yamadaRemoved!==undefined){const y=value.demoCleanup.yamadaRemoved;if(!record(y)||!record(y.customer)||!Array.isArray(y.routeDays)||y.routeDays.length>10000)return false;const c={...y.customer};delete c.schedule;if(!validState({customers:[c]}))return false;}
     if(value.calendar!==undefined){
       const base=value.calendar?.aWeekStart;
       if(!record(value.calendar)||typeof base!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(base)||base<'2000-01-01'||base>'2100-12-31')return false;

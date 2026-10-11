@@ -36,6 +36,20 @@ function withoutInitialDemo(data){
   const next=clone(data),ids=new Set(removed.map(c=>c.id));next.customers=next.customers.filter(c=>!ids.has(c.id));next.demoCleanup={version:1,customers:clone(removed)};return next;
 }
 
+function withoutYamadaDemo(data){
+ const demo=demoCustomers.find(c=>c.id==='C001');
+ const target=data.customers.find(c=>c.id===demo.id&&c.name===demo.name&&c.address===demo.address&&!c.source&&!c.registered);
+ if(!target)return data;
+ const next=clone(data),days=(data.routeDays||[]).filter(d=>d.customerIds.includes(target.id));
+ const endRun=!!data.routeRun&&routeDayCustomers(data,data.routeRun.date,data.routeRun.routeId).every(c=>c.id===target.id);
+ next.demoCleanup ||= {version:1,customers:[]};
+ next.demoCleanup.yamadaRemoved={customer:clone(target),routeDays:clone(days)};
+ next.customers=next.customers.filter(c=>c.id!==target.id);
+ if(next.routeDays)next.routeDays=next.routeDays.map(d=>({...d,customerIds:d.customerIds.filter(id=>id!==target.id)})).filter(d=>d.customerIds.length);
+ if(endRun)delete next.routeRun;
+ return next;
+}
+
 function statusLabel(status){
   return status === 'done' ? '完了' : status === 'absent' ? '不在' : '未配達';
 }
@@ -452,7 +466,7 @@ function escapeHtml(value=''){
 document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {if(vaultUnlocked)setScreen(btn.dataset.screen);}));
 DeliveryVault.init(async data => {
   state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'calendar'; editingCustomerId=null;
-  const cleaned=withoutInitialDemo(state);
+  const cleaned=withoutYamadaDemo(withoutInitialDemo(state));
   if(cleaned!==state){try{await DeliveryVault.save(cleaned);if(!vaultUnlocked)return;state=cleaned;}catch(e){return;}}
 
   currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;
