@@ -6,6 +6,14 @@ function routeOpenPlanner(id='',date='',customerIdsFilter=null){
  routeClearPlanner();const r=state.routes?.find(r=>r.id===id),customers=r?(date?routeDayCustomers(state,date,id):routeBaseCustomers(state,id)):[];
  routePlanner={id,date,customerIdsFilter,name:r?.name||'',week:r?.week||calendarWeek(calendarSelected),weekday:r?.weekday??5,selected:customers.map(c=>c.id),order:customers.map(c=>c.id),query:'',area:'',mode:'move',message:'地域で顧客を選択し、位置を確認して訪問順を作ってください。',positionId:'',draft:null,center:null,zoom:13};setScreen('planner');
 }
+function routeOpenSettingsMap(){
+ const form=document.getElementById('routeForm');if(!form||!vaultUnlocked)return;
+ const order=[...document.querySelectorAll('[data-route-member]')].filter(el=>el.checked).map(el=>({id:el.dataset.routeMember,order:Number([...document.querySelectorAll('[data-route-order]')].find(x=>x.dataset.routeOrder===el.dataset.routeMember)?.value)})).sort((a,b)=>a.order-b.order).map(x=>x.id);
+ if(!order.length){document.getElementById('routeMessage').textContent='地図を開く前に、配達する顧客にチェックを入れてください。';return;}
+ const draft={id:selectedRouteId,name:form.elements.routeName.value,week:form.elements.routeWeek.value,weekday:Number(form.elements.routeWeekday.value),order};
+ routeOpenPlanner(selectedRouteId);routeSettingsDraft=draft;Object.assign(routePlanner,draft,{selected:[...order],order:[...order],fromSettings:true});render();
+}
+function routeReturnSettings(){const p=routePlanner;if(p?.fromSettings)routeSettingsDraft={id:p.id,name:p.name,week:p.week,weekday:p.weekday,order:[...p.order,...p.selected.filter(id=>!p.order.includes(id))]};const date=p?.date;routeClearPlanner();setScreen(date?'calendar':'settings');}
 function routeFiltered(){const p=routePlanner,q=p.query.trim().normalize('NFKC').toLowerCase();return state.customers.filter(c=>(!p.customerIdsFilter||p.customerIdsFilter.includes(c.id))&&(!p.area||routeTown(c)===p.area)&&(!q||[c.name,c.address,c.area,c.source?.customerCode].some(s=>String(s||'').normalize('NFKC').toLowerCase().includes(q))));}
 function routeSelectionText(c){const r=state.routes?.find(r=>r.id===c.schedule?.routeId);return r?`${r.name}（${r.week}週・${['日','月','火','水','木','金','土'][r.weekday]}曜）`:'予定未設定';}
 function renderRoutePlanner(){
@@ -18,7 +26,7 @@ function renderRoutePlanner(){
  ${c?`<section class="route-position"><h3>${escapeHtml(c.name)}の位置登録</h3><p>${escapeHtml(c.address)}</p><p>地図を移動・拡大し、訪問先をタップしてください。現在地は現地にいる場合だけ使ってください。</p><div class="route-buttons"><button type="button" id="mapGPS">現地の現在地を使う</button><button type="button" id="mapCancelPosition">位置登録を閉じる</button></div><form id="mapPositionForm"><label>緯度<input name="lat" type="number" step="any" min="-90" max="90" required value="${p.draft?.lat??''}"></label><label>経度<input name="lng" type="number" step="any" min="-180" max="180" required value="${p.draft?.lng??''}"></label><p>位置はこの端末に暗号化して保存します。</p><button type="submit">この顧客の位置を保存</button></form></section>`:''}
  <div class="route-buttons"><button type="button" id="mapUndo" ${p.order.length?'':'disabled'}>1つ戻す</button><button type="button" id="mapClearOrder" ${p.order.length?'':'disabled'}>順番をやり直す</button><button type="button" id="mapAddRemaining" ${left.length?'':'disabled'}>残り${left.length}件を一覧順に追加</button></div>
  <section><h3>訪問順 <span id="routeOrderCount">${p.order.length}</span>件</h3><ol id="mapOrderList">${routeOrderHtml()}</ol><p id="routeRemaining">順番未設定 ${left.length}件。位置未登録の顧客も、一覧から手動で追加できます。</p></section>
- <form id="mapSaveForm">${p.date?'<p>この日だけの変更です。基本ルートと過去の配達実績は変更しません。</p>':`<label>ルート名<input name="name" required maxlength="80" value="${escapeHtml(p.name)}" placeholder="例：細尾・清滝"></label><label>交換週<select name="week">${['A','B','C','D'].map(w=>`<option ${p.week===w?'selected':''}>${w}</option>`).join('')}</select></label><label>曜日<select name="weekday">${['日','月','火','水','木','金','土'].map((d,i)=>`<option value="${i}" ${p.weekday===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>`}<button type="submit">${p.date?'当日の訪問順を保存':'週・曜日と訪問順を保存'}</button><p class="small">選んだ顧客全員に順番を付けてから保存してください。定期ルートを保存すると、選んだ顧客をこのルートへ移動します。編集時に選択から外した顧客は、この定期ルートの予定から外れます。</p></form></section>`;
+ <form id="mapSaveForm">${p.fromSettings?'<p>週・曜日は設定画面の入力を引き継いでいます。戻った後に登録して確定します。</p>':p.date?'<p>この日だけの変更です。基本ルートと過去の配達実績は変更しません。</p>':`<label>ルート名<input name="name" required maxlength="80" value="${escapeHtml(p.name)}" placeholder="例：細尾・清滝"></label><label>交換週<select name="week">${['A','B','C','D'].map(w=>`<option ${p.week===w?'selected':''}>${w}</option>`).join('')}</select></label><label>曜日<select name="weekday">${['日','月','火','水','木','金','土'].map((d,i)=>`<option value="${i}" ${p.weekday===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>`}<button type="submit">${p.fromSettings?'この訪問順で設定へ戻る':p.date?'当日の訪問順を保存':'週・曜日と訪問順を保存'}</button><p class="small">選んだ顧客全員に順番を付けてから保存してください。定期ルートを保存すると、選んだ顧客をこのルートへ移動します。編集時に選択から外した顧客は、この定期ルートの予定から外れます。</p></form></section>`;
 }
 function routeOrderHtml(){return (routePlanner?.order||[]).map((id,i)=>{const c=state.customers.find(c=>c.id===id);return `<li><strong>${i+1}. ${escapeHtml(c?.name||'')}</strong><small>${routePosition(c)?'':'位置未登録・手動指定'}</small><div class="route-buttons"><button type="button" data-map-up="${escapeHtml(id)}" ${i?'':'disabled'} aria-label="${escapeHtml(c?.name)}を上へ">↑</button><button type="button" data-map-down="${escapeHtml(id)}" ${i===routePlanner.order.length-1?'disabled':''} aria-label="${escapeHtml(c?.name)}を下へ">↓</button><button type="button" data-map-remove="${escapeHtml(id)}">順番から外す</button></div></li>`;}).join('');}
 function routePlannerMessage(text){if(routePlanner)routePlanner.message=text;const el=document.getElementById('mapStatus');if(el)el.textContent=text;}
@@ -54,6 +62,7 @@ async function routeSavePosition(event){event.preventDefault();if(!routePlanner?
 async function routeSavePlan(event){
  event.preventDefault();if(!routePlanner||!vaultUnlocked||routePlannerBusy)return;routeCaptureForm();const p=routePlanner;
  if(!p.order.length||p.order.length!==p.selected.length||p.selected.some(id=>!p.order.includes(id))){routePlannerMessage('選んだ顧客全員の訪問順を設定してください。');return;}
+ if(p.fromSettings){routeReturnSettings();return;}
  if(!p.date&&(!p.name.trim()||p.name.length>80)){routePlannerMessage('ルート名を入力してください。');return;}
  const moved=!p.date?p.order.filter(id=>{const c=state.customers.find(c=>c.id===id);return c.schedule&&c.schedule.routeId!==p.id;}):[];
  if(moved.length&&!confirm(`${moved.length}件を別の定期ルートから移動します。顧客一覧の現在の予定を確認済みですか？`))return;
@@ -66,7 +75,7 @@ function wireRoutePlanner(){
  document.querySelectorAll('[data-route-start]').forEach(b=>b.addEventListener('click',()=>routeStartDelivery(b.dataset.routeStart,b.dataset.routeDate)));
  document.querySelector('[data-route-stop]')?.addEventListener('click',routeStopDelivery);
  if(currentScreen!=='planner'||!routePlanner)return;const p=routePlanner;
- document.querySelector('[data-route-close]').addEventListener('click',()=>{const date=p.date;routeClearPlanner();setScreen(date?'calendar':'settings');});
+ document.querySelector('[data-route-close]').addEventListener('click',routeReturnSettings);
  document.getElementById('mapArea').addEventListener('change',e=>{p.area=e.target.value;routePlannerRender();});document.getElementById('mapQuery').addEventListener('change',e=>{p.query=e.target.value;routePlannerRender();});
  document.getElementById('mapPickAll').addEventListener('click',()=>{p.selected=[...new Set([...p.selected,...routeFiltered().map(c=>c.id)])];routePlannerRender();});document.getElementById('mapUnpickAll').addEventListener('click',()=>{const ids=new Set(routeFiltered().map(c=>c.id));p.selected=p.selected.filter(id=>!ids.has(id));p.order=p.order.filter(id=>!ids.has(id));routePlannerRender();});
  document.querySelectorAll('[data-map-pick]').forEach(el=>el.addEventListener('change',()=>{const id=el.dataset.mapPick;if(el.checked&&!p.selected.includes(id))p.selected.push(id);else if(!el.checked){p.selected=p.selected.filter(x=>x!==id);p.order=p.order.filter(x=>x!==id);}routePlannerRender();}));

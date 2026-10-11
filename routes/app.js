@@ -19,6 +19,7 @@ let vaultUnlocked = false;
 let currentScreen = 'list';
 let editingCustomerId = null;
 let selectedRouteId='';
+let routeSettingsDraft=null;
 let resumeLocation=null;
 let currentCustomerId = state.customers.find(c => c.status === 'pending')?.id || state.customers[0]?.id;
 
@@ -299,25 +300,26 @@ async function saveCustomerForm(event){
 function renderRouteSettings(){
   const routes=state.routes || [], route=routes.find(r=>r.id===selectedRouteId);
   if(!route) selectedRouteId='';
+  const draft=routeSettingsDraft?.id===selectedRouteId?routeSettingsDraft:null;
   const days=['日','月','火','水','木','金','土'];
   const assigned=state.customers.filter(c=>c.schedule).length;
   return `<section class="route-settings">
     <h2>配達予定の設定</h2>
-    <button type="button" data-route-planner="">地域を選び、地図で新しいルートを作る</button>
-    ${route?`<button type="button" data-route-planner="${escapeHtml(route.id)}">このルートを地図で編集</button>`:''}
     <p>ルートごとにA〜D週・曜日を設定し、顧客をまとめて登録します。設定済み ${assigned}件／未設定 ${state.customers.length-assigned}件</p>
     <label>編集するルート<select id="routeSelect"><option value="">新しいルートを作成</option>${routes.map(r=>`<option value="${escapeHtml(r.id)}" ${r.id===selectedRouteId?'selected':''}>${escapeHtml(r.name)}（${r.week}週・${days[r.weekday]}曜）</option>`).join('')}</select></label>
     <form id="routeForm">
-      <label>ルート名<input name="routeName" maxlength="80" value="${escapeHtml(route?.name || '')}" placeholder="例：今市ルート" required /></label>
-      <label>配達週<select name="routeWeek">${['A','B','C','D'].map(w=>`<option value="${w}" ${route?.week===w?'selected':''}>${w}週</option>`).join('')}</select></label>
-      <label>曜日<select name="routeWeekday">${days.map((d,i)=>`<option value="${i}" ${(route?.weekday ?? 1)===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>
+      <label>ルート名<input name="routeName" maxlength="80" value="${escapeHtml(draft?.name ?? route?.name ?? '')}" placeholder="例：今市ルート" required /></label>
+      <label>配達週<select name="routeWeek">${['A','B','C','D'].map(w=>`<option value="${w}" ${(draft?.week??route?.week)===w?'selected':''}>${w}週</option>`).join('')}</select></label>
+      <label>曜日<select name="routeWeekday">${days.map((d,i)=>`<option value="${i}" ${(draft?.weekday ?? route?.weekday ?? 1)===i?'selected':''}>${d}曜日</option>`).join('')}</select></label>
       <label>地区からまとめて選択<select id="routeArea"><option value="">地区を選ぶ</option>${[...new Set(state.customers.map(c=>c.area))].map(a=>`<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}</select></label>
       <button type="button" id="routePickArea">地区の顧客を選択して順番を振る</button>
       <p>配達する顧客にチェックを入れ、順番を指定してください。選択した顧客はこのルートへ移動します。チェックを外した既存メンバーは未設定になります。</p>
       ${state.customers.map((c,i)=>{
-        const member=!!route && c.schedule?.routeId===route.id, assignedRoute=routes.find(r=>r.id===c.schedule?.routeId);
-        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''} /><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name || '未設定')}</small></label><input type="number" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順" /></div>`;
+        const member=draft?draft.order.includes(c.id):!!route && c.schedule?.routeId===route.id, assignedRoute=routes.find(r=>r.id===c.schedule?.routeId);
+        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''} /><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name || '未設定')}</small></label><input type="number" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${draft&&member?draft.order.indexOf(c.id)+1:member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順" /></div>`;
       }).join('')}
+      <button type="button" id="routeOpenMap">地図で訪問順を決める</button>
+      <p class="small">地図は必要な場合だけ使えます。最後に下のボタンで登録してください。</p>
       <button type="submit">${route?'ルートと配達順を保存':'ルートを登録'}</button>
     </form>
     <p id="routeMessage" role="status"></p>
@@ -345,7 +347,7 @@ async function saveRouteForm(event){
   if(!DeliverySecurity.validState(next)){message.textContent='配達順は1〜5000の整数にし、同じルート内で重複させないでください。ルートは最大500件です。';return;}
   try{await DeliveryVault.save(next);}catch(e){message.textContent='保存できませんでした。以前の配達予定は残っています。';return;}
   if(!vaultUnlocked)return;
-  state=next;selectedRouteId=id;render();document.getElementById('routeMessage').textContent='配達予定を暗号化して保存しました。';
+  state=next;selectedRouteId=id;routeSettingsDraft=null;render();document.getElementById('routeMessage').textContent='配達予定を暗号化して保存しました。';
 }
 
 function wireEvents(){
@@ -355,13 +357,14 @@ function wireEvents(){
   wireCash();
   wireCalendar();
   wireExcelImport();
+  document.getElementById('routeOpenMap')?.addEventListener('click',routeOpenSettingsMap);
   document.getElementById('routePickArea')?.addEventListener('click',()=>{
     const area=document.getElementById('routeArea').value;if(!area)return;
     const members=[...document.querySelectorAll('[data-route-member]')],orders=[...document.querySelectorAll('[data-route-order]')];let order=0;
     for(const el of members){if(state.customers.find(c=>c.id===el.dataset.routeMember)?.area===area)el.checked=true;if(el.checked){const input=orders.find(x=>x.dataset.routeOrder===el.dataset.routeMember);if(input)input.value=String(++order);}}
     document.getElementById('routeMessage').textContent='地区の顧客を選択しました。選択した顧客の順番を上から振り直しました。保存で確定します。';
   });
-  document.getElementById('routeSelect')?.addEventListener('change',event=>{selectedRouteId=event.target.value;render();});
+  document.getElementById('routeSelect')?.addEventListener('change',event=>{selectedRouteId=event.target.value;routeSettingsDraft=null;render();});
   document.getElementById('routeForm')?.addEventListener('submit',saveRouteForm);
 
   document.querySelector('[data-add-customer]')?.addEventListener('click', () => openCustomerForm());
@@ -478,7 +481,7 @@ DeliveryVault.init(async data => {
   routeClearPlanner();
   suspendExcelPicker();clearExcelImport();
   historyDate=calendarToday();historyArea='';
-  vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
+  routeSettingsDraft=null; vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
   document.getElementById('main').replaceChildren();
   document.getElementById('screenTitle').textContent='ロック中';
   document.getElementById('topCount').textContent='';
