@@ -1,5 +1,11 @@
 'use strict';
-let excelImport=null,excelEpoch=0;
+let excelImport=null,excelEpoch=0,excelPicker=null;
+// Keep only the user-selected File handle across the native picker lock. Never parse while locked.
+function clearExcelPicker(){if(!excelPicker)return;clearTimeout(excelPicker.timer);excelPicker.host?.remove();excelPicker=null;}
+function armExcelPicker(event){clearExcelPicker();event.target.value='';excelPicker={input:event.target,file:null,host:null,timer:setTimeout(()=>{clearExcelPicker();if(vaultUnlocked&&currentScreen==='settings')render();},300000)};}
+function suspendExcelPicker(){if(!excelPicker?.input||excelPicker.file||excelPicker.host)return;const host=document.createElement('div');host.hidden=true;document.body.appendChild(host);excelPicker.input.id='excelPendingFile';host.appendChild(excelPicker.input);excelPicker.host=host;}
+function resumeExcelPicker(){const file=excelPicker?.file;if(file&&vaultUnlocked)readExcelFile({target:{files:[file]}});}
+window.addEventListener('pagehide',clearExcelPicker);
 function clearExcelImport(){excelEpoch++;if(excelImport){excelImport.worker?.terminate();clearTimeout(excelImport.timer);}excelImport=null;}
 function excelMessage(text){const el=document.getElementById('excelMessage');if(el)el.textContent=text;}
 function renderExcelImport(){
@@ -20,6 +26,7 @@ function renderExcelImport(){
   }
   return `<section class="route-settings excel-settings"><details ${data?'open':''}><summary>顧客一覧のExcel取込</summary>
     <p>写真の青い見出しと、照合済みExcelの「明細」シートに対応しています。Excelファイルを選んでください。ファイルは外部へ送信せず、登録前に内容を確認できます。</p>
+    ${excelPicker?.file?'<p class="warning-box">ファイルは選択済みです。ロック解除後、読み込みを再開できます。</p><button type="button" id="excelResume">選択したExcelを読み込む</button>':''}
     <label>顧客一覧ファイル<input id="excelFile" type="file" accept=".xlsx,.xls,.csv,.tsv" /></label>
     <p class="small">iPhoneでは「ファイル」に保存したExcelを選べます。xlsx・xls・CSV・TSV／10MB以内。写真自体の読取には対応していません。コード・郵便番号・電話番号はExcelで文字列にしておくと先頭の0を保てます。</p>
     ${data?.rows?`<label>シート<select id="excelSheet">${data.sheets.map((s,i)=>`<option value="${i}" ${data.index===i?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select></label>
@@ -35,13 +42,15 @@ function renderExcelImport(){
   </details></section>`;
 }
 async function readExcelFile(event){
-  const file=event.target.files?.[0];if(!file||!vaultUnlocked)return;
+  const file=event.target.files?.[0];if(!file)return;
+  if(!vaultUnlocked){if(excelPicker){excelPicker.file=file;excelPicker.input=null;excelPicker.host?.remove();excelPicker.host=null;document.getElementById('vaultMessage').textContent='ファイルを選択しました。ロック解除後、設定で「選択したExcelを読み込む」を押してください。';}return;}
+  clearExcelPicker();
   clearExcelImport();const token=excelEpoch;
   if(!/\.(xlsx|xls|csv|tsv)$/i.test(file.name)||file.size>10*1024*1024||file.size===0){excelMessage('xlsx・xls・CSV・TSVの10MB以内のファイルを選んでください。');return;}
   excelImport={message:'読み込み中です…',worker:null,rows:null};excelMessage(excelImport.message);
   try{
     const buffer=await file.arrayBuffer();if(token!==excelEpoch||!vaultUnlocked)return;
-    const worker=new Worker('./excel-worker.js');excelImport.worker=worker;
+    const worker=new Worker(new URL('./excel-worker.js',document.baseURI));excelImport.worker=worker;
     const timeout=()=>{if(token!==excelEpoch)return;worker.terminate();excelImport.message='読み込みが時間内に終わりませんでした。必要なシートだけのファイルにしてください。';excelMessage(excelImport.message);};
     excelImport.timer=setTimeout(timeout,20000);
     worker.onmessage=event=>{
@@ -55,7 +64,11 @@ async function readExcelFile(event){
   }catch(e){if(token===excelEpoch){excelImport.message='ファイルを開けませんでした。端末に保存してから選択してください。';excelMessage(excelImport.message);}}
 }
 function wireExcelImport(){
-  document.getElementById('excelFile')?.addEventListener('change',readExcelFile);
+  const fileInput=document.getElementById('excelFile');
+  fileInput?.addEventListener('click',armExcelPicker);
+  fileInput?.addEventListener('change',readExcelFile);
+  fileInput?.addEventListener('cancel',()=>{clearExcelPicker();if(vaultUnlocked&&currentScreen==='settings')render();});
+  document.getElementById('excelResume')?.addEventListener('click',resumeExcelPicker);
   document.getElementById('excelSheet')?.addEventListener('change',event=>{
     const index=Number(event.target.value);excelImport.preview=null;excelImport.rows=null;excelImport.message='シートを読み込み中です…';render();
     clearTimeout(excelImport.timer);const token=excelEpoch;
@@ -85,4 +98,5 @@ async function commitExcelImport(){
     document.querySelector('.excel-settings details').open=true;
   }catch(e){if(token===excelEpoch&&vaultUnlocked){button.disabled=false;excelMessage('登録できませんでした。元の保存データとプレビューは残しています。'+e.message);}}
 }
+
 

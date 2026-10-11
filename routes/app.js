@@ -47,7 +47,7 @@ function getCounts(){
 function setScreen(screen){
   if(currentScreen==='planner'&&screen!=='planner')routeClearPlanner();
   if(currentScreen==='settings' && screen!=='settings'){
-    clearExcelImport();
+    clearExcelPicker();clearExcelImport();
     for(const id of ['backupPassword','backupConfirm','restorePassword']) document.getElementById(id).value='';
     document.getElementById('restoreFile').value='';
   }
@@ -451,7 +451,7 @@ DeliveryVault.init(data => {
 }, () => {
   if(vaultUnlocked) resumeLocation={screen:['calendar','delivery','check','settings'].includes(currentScreen)?currentScreen:'list',customerId:currentCustomerId};
   routeClearPlanner();
-  clearExcelImport();
+  suspendExcelPicker();clearExcelImport();
   historyDate=calendarToday();historyArea='';
   vaultUnlocked=false; state={customers:[]}; currentCustomerId=null; editingCustomerId=null;
   document.getElementById('main').replaceChildren();
