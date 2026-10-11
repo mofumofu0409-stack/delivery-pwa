@@ -10,7 +10,7 @@ function clearExcelImport(){excelCompleted=null;excelEpoch++;if(excelImport){exc
 function excelMessage(text){const el=document.getElementById('excelMessage');if(el)el.textContent=text;const status=document.getElementById('excelFileStatus');if(status&&!excelCompleted)status.innerHTML=renderExcelFileStatus();}
 function renderExcelFileStatus(){
  const d=excelImport,done=excelCompleted;
- if(done)return `<h3>登録完了</h3><p class="excel-file-name">${escapeHtml(done.filename)}</p><p>${done.customers}顧客・${done.rows}明細を確認しました。</p><strong class="excel-stage">保存済み</strong><p>新規 ${done.counts.added}件／更新 ${done.counts.updated}件／登録済みのためスキップ ${done.counts.skipped}件</p><button type="button" id="excelViewImported">登録した顧客を一覧から選択</button>`;
+ if(done)return `<h3>登録完了</h3><p class="excel-file-name">${escapeHtml(done.filename)}</p><p>${done.customers}顧客・${done.rows}明細を確認しました。</p><strong class="excel-stage">保存済み</strong>${done.locations?`<p>地図：番地一致 ${done.locations.numbered}件／町の目安 ${done.locations.town}件／未照合 ${done.locations.missing}件</p>`:""}<p>新規 ${done.counts.added}件／更新 ${done.counts.updated}件／登録済みのためスキップ ${done.counts.skipped}件</p><button type="button" id="excelViewImported">次へ：配達予定を設定</button>`;
  if(!d)return excelPicker?.file?`<h3>読み込みの再開待ち</h3><p class="excel-file-name">${escapeHtml(excelPicker.file.name)}</p><p>上の再開ボタンを押してください。まだ登録されていません。</p>`:'<p>まだファイルを選択していません。</p>';
  const name=`<p class="excel-file-name">${escapeHtml(d.filename||'選択したExcel')}</p>`;
  if(d.error)return '<h3>読み込めませんでした</h3>'+name+'<p>下のメッセージを確認して、ファイルを選び直してください。登録済みのデータは変更していません。</p>';
@@ -37,7 +37,7 @@ function renderExcelImport(){
       <button type="button" id="excelCommit" ${counts.added+counts.updated?'':'disabled'}>確認した内容を暗号化して登録</button>`;
     }catch(e){preview=`<p class="excel-error">${escapeHtml(e.message)}</p>`;}
   }
-  return `<section class="route-settings"><h2>登録済み顧客の一覧</h2><p>Excelから登録済み：${excelSavedCustomerIds().length}件／全顧客：${state.customers.length}件</p><button type="button" id="excelChooseSaved" ${excelSavedCustomerIds().length?'':'disabled'}>Excel登録済みの顧客を一覧から選択</button><button type="button" data-route-planner="">すべての顧客を一覧から選択</button></section>
+  return `<section class="route-settings"><h2>登録済み顧客の一覧</h2><p>Excelから登録済み：${excelSavedCustomerIds().length}件／全顧客：${state.customers.length}件</p><button type="button" id="excelChooseSaved" ${excelSavedCustomerIds().length?'':'disabled'}>Excel登録済みの顧客で配達予定を作る</button><button type="button" data-route-planner="">すべての顧客を一覧から選択</button></section>
   <section class="route-settings excel-settings"><details ${data||excelCompleted||excelPicker?.file?'open':''}><summary>顧客一覧のExcel取込</summary>
     <p>① ファイルを選ぶ → ② 顧客一覧を確認 → ③ 登録する</p>
     ${excelPicker?.file?'<button type="button" id="excelResume">選択したExcelを読み込む</button>':''}
@@ -89,8 +89,8 @@ function wireExcelImport(){
   document.getElementById('excelResume')?.addEventListener('click',resumeExcelPicker);
   document.getElementById('excelSheet')?.addEventListener('change',event=>excelChangeSheet(Number(event.target.value)));
   document.getElementById('excelRecommended')?.addEventListener('click',()=>excelChangeSheet(excelImport.recommendedIndex));
-  document.getElementById('excelChooseSaved')?.addEventListener('click',()=>routeOpenPlanner('','',excelSavedCustomerIds()));
-  document.getElementById('excelViewImported')?.addEventListener('click',()=>routeOpenPlanner('','',excelSavedCustomerIds()));
+  document.getElementById('excelChooseSaved')?.addEventListener('click',routeBeginImportedSetup);
+  document.getElementById('excelViewImported')?.addEventListener('click',routeBeginImportedSetup);
   document.getElementById('excelHeader')?.addEventListener('change',event=>{
     const header=Number(event.target.value)-1;if(!Number.isInteger(header)||header<0||header>=excelImport.rows.length){excelMessage('見出し行の番号を確認してください。');return;}
     excelImport.header=header;excelImport.map=DeliveryImport.mapping(excelImport.rows[header]||[]);excelImport.preview=null;render();
@@ -104,12 +104,14 @@ function wireExcelImport(){
   });
   document.getElementById('excelCommit')?.addEventListener('click',commitExcelImport);
 }
+function routeBeginImportedSetup(){selectedRouteId='';routeSettingsDraft=null;setScreen('settings');document.getElementById('routeEditHeading')?.scrollIntoView({block:'start'});}
 async function commitExcelImport(){
   if(!vaultUnlocked||!excelImport?.preview)return;
   const token=excelEpoch,button=document.getElementById('excelCommit');button.disabled=true;
   try{
     const result=DeliveryImport.merge(state,excelImport.preview,excelImport.update);
     const completed={filename:excelImport.filename||'選択したExcel',rows:excelImport.preview.rows,customers:excelImport.preview.customers.length,counts:result.counts};
+    if(window.DeliveryAddress){result.state=DeliveryAddress.enrich(result.state);const imported=excelImport.preview.customers.map(c=>DeliveryImport.match(result.state.customers,c));completed.locations={numbered:imported.filter(c=>c?.location?.address===c.address&&['parcel','building','manual'].includes(c.location.precision)).length,town:imported.filter(c=>c?.location?.address===c.address&&c.location.precision==='town').length,missing:imported.filter(c=>!c?.location||c.location.address!==c.address).length};}
     await DeliveryVault.save(result.state);if(token!==excelEpoch||!vaultUnlocked)return;
     state=result.state;const c=result.counts;clearExcelImport();excelCompleted=completed;render();document.getElementById('excelFileStatus')?.scrollIntoView?.({block:'center'});excelMessage(`登録しました。新規 ${c.added}件／更新 ${c.updated}件／スキップ ${c.skipped}件。`);
     document.querySelector('.excel-settings details').open=true;

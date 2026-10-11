@@ -1,0 +1,9 @@
+Public address reference data for Nikko, Tochigi, Japan.
+Source: Geolonia japanese-addresses-v2, derived from the Digital Agency Address Base Registry.
+https://github.com/geolonia/japanese-addresses-v2
+https://dataset.address-br.digital.go.jp/
+Data license: Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+Retrieved: 2026-10-11. Source metadata updated: 1735102670.
+Changes: combined municipality town, parcel and residential reference coordinates into a compact browser data file; omitted records without coordinates.
+No customer data is included. Coordinates are reference positions; they do not guarantee building entrances. Town coordinates are approximate representative points.

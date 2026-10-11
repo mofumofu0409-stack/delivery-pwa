@@ -275,7 +275,7 @@ async function saveCustomerForm(event){
   const address = form.elements.customerAddress.value.trim();
   const area = form.elements.customerArea.value.trim() || '未分類';
   if (!DeliverySecurity.validateCustomer(name, address, area)) { alert('顧客名と住所を入力してください。'); return; }
-  const next = clone(state);
+  let next = clone(state);
   let customer = next.customers.find(c => c.id === editingCustomerId);
   if (editingCustomerId && !customer) { alert('編集する顧客が見つかりません。'); return; }
   let contract;
@@ -289,6 +289,7 @@ async function saveCustomerForm(event){
   }
   Object.assign(customer,contract);
   if(form.elements.contractAmount && !form.elements.contractAmount.value.trim()) delete customer.contractAmount;
+  if(window.DeliveryAddress)next=DeliveryAddress.enrich(next);
   if (storageBlocked || !DeliverySecurity.validState(next)) { alert('保存するデータの形式を確認してください。'); return; }
   try { await DeliveryVault.save(next); if(!vaultUnlocked) return; }
   catch(e) { alert('端末に保存できませんでした。空き容量やブラウザの設定を確認してください。入力はこの画面に残っています。'); return; }
@@ -306,7 +307,8 @@ function renderRouteSettings(){
   return `<section class="route-settings">
     <h2>配達予定の設定</h2>
     <h3>登録済みルート</h3>
-    ${routes.length?routes.map(r=>{const members=routeBaseCustomers(state,r.id),missing=members.filter(c=>!routePosition(c)).length;return `<section class="panel"><h3>${escapeHtml(r.name)}：${r.week}週・${days[r.weekday]}曜</h3><p>顧客 ${members.length}件／地図の位置未登録 ${missing}件</p><button type="button" data-saved-route-map="${escapeHtml(r.id)}">地図で顧客を見る</button><button type="button" data-saved-route-edit="${escapeHtml(r.id)}">内容を編集</button><details><summary>顧客一覧を見る</summary><ol>${members.map(c=>`<li>${escapeHtml(c.name)}（${escapeHtml(c.area)}）</li>`).join('')}</ol></details></section>`;}).join(''):'<p>まだルートが登録されていません。</p>'}
+    ${routes.length?routes.map(r=>{const members=routeBaseCustomers(state,r.id),missing=members.filter(c=>!routePosition(c)).length,review=members.filter(c=>routePosition(c)&&c.location.precision&&c.location.precision!=='manual').length;return `<section class="panel"><h3>${escapeHtml(r.name)}：${r.week}週・${days[r.weekday]}曜</h3><p>顧客 ${members.length}件／未照合 ${missing}件／参照位置・要確認 ${review}件</p><button type="button" data-saved-route-map="${escapeHtml(r.id)}">地図で顧客を見る</button><button type="button" data-saved-route-edit="${escapeHtml(r.id)}">内容を編集</button><details><summary>顧客一覧を見る</summary><ol>${members.map(c=>`<li>${escapeHtml(c.name)}（${escapeHtml(c.area)}）</li>`).join('')}</ol></details></section>`;}).join(''):'<p>まだルートが登録されていません。</p>'}
+    <p class="small">住所の地図照合：日光市に対応。番地一致／町の代表位置を区別します。住所データ：<a href="https://github.com/geolonia/japanese-addresses-v2" target="_blank" rel="noopener noreferrer">Geolonia・デジタル庁（CC BY 4.0）</a>。端末内で照合しています。</p>
     <h3 id="routeEditHeading">${route?'ルートを編集':'新しいルートを登録'}</h3>
     <p>ルートごとにA〜D週・曜日を設定し、顧客をまとめて登録します。設定済み ${assigned}件／未設定 ${state.customers.length-assigned}件</p>
     <label>編集するルート<select id="routeSelect"><option value="">新しいルートを作成</option>${routes.map(r=>`<option value="${escapeHtml(r.id)}" ${r.id===selectedRouteId?'selected':''}>${escapeHtml(r.name)}（${r.week}週・${days[r.weekday]}曜）</option>`).join('')}</select></label>
@@ -318,7 +320,7 @@ function renderRouteSettings(){
       <p>配達する人にチェックを入れてください。不要な人は外せます。</p>
       ${state.customers.map((c,i)=>{
         const member=draft?draft.order.includes(c.id):!!route&&c.schedule?.routeId===route.id,assignedRoute=routes.find(r=>r.id===c.schedule?.routeId);
-        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''}><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name||'未設定')}</small></label></div>`;
+        return `<div class="route-customer"><input type="checkbox" id="route-member-${i}" data-route-member="${escapeHtml(c.id)}" ${member?'checked':''}><label for="route-member-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.address)}<br>${escapeHtml(c.area)}／${escapeHtml(assignedRoute?.name||'未設定')}</small></label></div>`;
       }).join('')}
       <h3>3. ルート名を入力</h3>
       <label>ルート名<input name="routeName" maxlength="80" value="${escapeHtml(draft?.name??route?.name??'')}" placeholder="例：七里" required></label>
@@ -360,7 +362,7 @@ async function saveRouteForm(event){
   if(!DeliverySecurity.validState(next)){message.textContent='配達順は1〜5000の整数にし、同じルート内で重複させないでください。ルートは最大500件です。';return;}
   try{await DeliveryVault.save(next);}catch(e){message.textContent='保存できませんでした。以前の配達予定は残っています。';return;}
   if(!vaultUnlocked)return;
-  state=next;selectedRouteId=id;routeSettingsDraft=null;render();document.getElementById('routeMessage').textContent='配達予定を暗号化して保存しました。';
+  state=next;selectedRouteId=id;routeSettingsDraft=null;render();document.getElementById('routeMessage').innerHTML='配達予定を暗号化して保存しました。<button type="button" id="routeViewSchedule">次へ：カレンダーで予定を確認</button>';document.getElementById('routeViewSchedule')?.addEventListener?.('click',()=>{const start=calendarDay(calendarToday());for(let n=0;n<28;n++){const key=calendarKey(start+n);if(calendarWeek(key)===route.week&&new Date(key+'T00:00:00Z').getUTCDay()===route.weekday){calendarSelected=calendarDate=key;break;}}setScreen('calendar');window.scrollTo(0,0);});document.getElementById('routeMessage')?.scrollIntoView?.({block:'center'});
 }
 
 function syncRouteOrderRows(){
@@ -490,7 +492,8 @@ function escapeHtml(value=''){
 document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {if(vaultUnlocked)setScreen(btn.dataset.screen);}));
 DeliveryVault.init(async data => {
   state=data; vaultUnlocked=true; storageBlocked=false; currentScreen=resumeLocation?.screen || 'calendar'; editingCustomerId=null;
-  const cleaned=withoutDemoCustomers(withoutInitialDemo(state));
+  const base=withoutDemoCustomers(withoutInitialDemo(state));
+  const cleaned=window.DeliveryAddress?DeliveryAddress.enrich(base):base;
   if(cleaned!==state){try{await DeliveryVault.save(cleaned);if(!vaultUnlocked)return;state=cleaned;}catch(e){return;}}
 
   currentCustomerId=state.customers.find(c=>c.status==='pending')?.id || state.customers[0]?.id;

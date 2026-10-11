@@ -78,7 +78,7 @@
     return value.customers.every(c => {
       if (!record(c) || typeof c.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(c.id) || ids.has(c.id)) return false;
       ids.add(c.id);
-      if(c.location!==undefined){const p=c.location;if(!record(p)||typeof p.lat!=='number'||!Number.isFinite(p.lat)||p.lat<-90||p.lat>90||typeof p.lng!=='number'||!Number.isFinite(p.lng)||p.lng<-180||p.lng>180||!text(p.address,300))return false;}
+      if(c.location!==undefined){const p=c.location;if(p.precision!==undefined&&!['town','parcel','building','manual'].includes(p.precision))return false;if(p.confirmed!==undefined&&typeof p.confirmed!=='boolean')return false;if(p.town!==undefined&&!text(p.town,100))return false;if(p.source!==undefined&&!text(p.source,100))return false;if(!record(p)||typeof p.lat!=='number'||!Number.isFinite(p.lat)||p.lat<-90||p.lat>90||typeof p.lng!=='number'||!Number.isFinite(p.lng)||p.lng<-180||p.lng>180||!text(p.address,300))return false;}
       if(c.paymentMethod!==undefined&&!payment(c.paymentMethod))return false;
       if(c.contractAmount!==undefined&&!money(c.contractAmount))return false;
       if (!text(c.name, 80) || !text(c.address, 300) || !text(c.area, 80) || !text(c.memo, 20000) || !text(c.note, 20000)) return false;

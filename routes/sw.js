@@ -1,10 +1,13 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.9.0-maplayout1';
+const CACHE = CACHE_PREFIX + 'v0.10.0-addressflow1';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './address-data.js',
+  './address.js',
+  './address-data-LICENSE.txt',
   './route-core.js',
   './route-map.js',
   './route-map.css',
