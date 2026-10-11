@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'delivery-support:' + self.registration.scope + ':';
-const CACHE = CACHE_PREFIX + 'v0.8.9-savedroutemap1';
+const CACHE = CACHE_PREFIX + 'v0.9.0-maplayout1';
 const ASSETS = [
   './',
   './index.html',
