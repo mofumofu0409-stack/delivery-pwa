@@ -8,6 +8,8 @@ function resumeExcelPicker(){const file=excelPicker?.file;if(file&&vaultUnlocked
 window.addEventListener('pagehide',clearExcelPicker);
 function clearExcelImport(){excelEpoch++;if(excelImport){excelImport.worker?.terminate();clearTimeout(excelImport.timer);}excelImport=null;}
 function excelMessage(text){const el=document.getElementById('excelMessage');if(el)el.textContent=text;}
+function excelSavedCustomerIds(){return state.customers.filter(c=>c.source).map(c=>c.id);}
+function excelChangeSheet(index){if(!excelImport?.worker)return;excelImport.preview=null;excelImport.rows=null;excelImport.message='シートを読み込み中です…';render();clearTimeout(excelImport.timer);const token=excelEpoch;excelImport.timer=setTimeout(()=>{if(token===excelEpoch&&excelImport){excelImport.worker.terminate();excelMessage('シートの読み込みが時間内に終わりませんでした。ファイルを選び直してください。');}},20000);excelImport.worker.postMessage({index});}
 function renderExcelImport(){
   const data=excelImport, fieldSelect=(key,label)=>`<label>${escapeHtml(label)}<select data-excel-map="${key}"><option value="-1">取り込まない</option>${(data?.rows[data.header]||[]).map((v,i)=>`<option value="${i}" ${data.map[key]===i?'selected':''}>${i+1}列：${escapeHtml(v||'（空欄）')}</option>`).join('')}</select></label>`;
   let preview='';
@@ -24,12 +26,12 @@ function renderExcelImport(){
       <button type="button" id="excelCommit" ${counts.added+counts.updated?'':'disabled'}>確認した内容を暗号化して登録</button>`;
     }catch(e){preview=`<p class="excel-error">${escapeHtml(e.message)}</p>`;}
   }
-  return `<section class="route-settings excel-settings"><details ${data?'open':''}><summary>顧客一覧のExcel取込</summary>
+  return `<section class="route-settings"><h2>登録済み顧客の一覧</h2><p>Excelから登録済み：${excelSavedCustomerIds().length}件／全顧客：${state.customers.length}件</p><button type="button" id="excelChooseSaved" ${excelSavedCustomerIds().length?'':'disabled'}>Excel登録済みの顧客を一覧から選択</button><button type="button" data-route-planner="">すべての顧客を一覧から選択</button></section><section class="route-settings excel-settings"><details ${data?'open':''}><summary>顧客一覧のExcel取込</summary>
     <p>写真の青い見出しと、照合済みExcelの「明細」シートに対応しています。Excelファイルを選んでください。ファイルは外部へ送信せず、登録前に内容を確認できます。</p>
     ${excelPicker?.file?'<p class="warning-box">ファイルは選択済みです。ロック解除後、読み込みを再開できます。</p><button type="button" id="excelResume">選択したExcelを読み込む</button>':''}
     <label>顧客一覧ファイル<input id="excelFile" type="file" accept=".xlsx,.xls,.csv,.tsv" /></label>
     <p class="small">iPhoneでは「ファイル」に保存したExcelを選べます。xlsx・xls・CSV・TSV／10MB以内。写真自体の読取には対応していません。コード・郵便番号・電話番号はExcelで文字列にしておくと先頭の0を保てます。</p>
-    ${data?.rows?`<label>シート<select id="excelSheet">${data.sheets.map((s,i)=>`<option value="${i}" ${data.index===i?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select></label>
+    ${data?.rows?`<p class="warning-box">読込済み：${escapeHtml(data.filename||'選択したExcel')}<br>${data.preview?'① 読み込み済み → ② 内容を確認 → ③ 下の登録ボタンで保存（まだ未登録）':'まだ登録していません。顧客名・住所のあるシートを選んでください。'}</p>${data.map.name<0||data.map.address<0?`<p class="excel-error">「${escapeHtml(data.sheets[data.index])}」では顧客名・住所の列が見つかりません。「照合」「画像照合メモ」は確認用です。</p>${Number.isInteger(data.recommendedIndex)&&data.recommendedIndex>=0&&data.recommendedIndex!==data.index?`<button type="button" id="excelRecommended">顧客一覧の「${escapeHtml(data.sheets[data.recommendedIndex])}」を開く</button>`:''}`:''}<label>シート<select id="excelSheet">${data.sheets.map((s,i)=>`<option value="${i}" ${data.index===i?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select></label>
     <label>青い見出しの行番号<input id="excelHeader" type="number" min="1" max="${data.rows.length}" value="${data.header+1}" /></label>
     <label>地区の初期値<input id="excelDefaultArea" maxlength="80" value="${escapeHtml(data.area||'未分類')}" /></label>
     <div class="excel-columns">${fieldSelect('name','顧客名（必須）')}${fieldSelect('address','住所（必須）')}</div>
@@ -47,7 +49,7 @@ async function readExcelFile(event){
   clearExcelPicker();
   clearExcelImport();const token=excelEpoch;
   if(!/\.(xlsx|xls|csv|tsv)$/i.test(file.name)||file.size>10*1024*1024||file.size===0){excelMessage('xlsx・xls・CSV・TSVの10MB以内のファイルを選んでください。');return;}
-  excelImport={message:'読み込み中です…',worker:null,rows:null};excelMessage(excelImport.message);
+  excelImport={message:'読み込み中です…',worker:null,rows:null,filename:file.name};excelMessage(excelImport.message);
   try{
     const buffer=await file.arrayBuffer();if(token!==excelEpoch||!vaultUnlocked)return;
     const worker=new Worker(new URL('./excel-worker.js',document.baseURI));excelImport.worker=worker;
@@ -56,8 +58,10 @@ async function readExcelFile(event){
     worker.onmessage=event=>{
       if(token!==excelEpoch||!vaultUnlocked)return;clearTimeout(excelImport.timer);
       if(event.data.error){excelImport.message=event.data.error;excelMessage(event.data.error);return;}
-      const {rows,sheets,index}=event.data,header=DeliveryImport.detect(rows);
-      Object.assign(excelImport,{rows,sheets,index,header,map:DeliveryImport.mapping(rows[header]||[]),area:'未分類',preview:null,update:false,message:'列と見出し行を確認してプレビューしてください。'});render();
+      const {rows,sheets,index,recommendedIndex}=event.data,header=DeliveryImport.detect(rows);
+      Object.assign(excelImport,{rows,sheets,index,recommendedIndex,header,map:DeliveryImport.mapping(rows[header]||[]),area:'未分類',preview:null,update:false,message:'列と見出し行を確認してプレビューしてください。'});
+      if(excelImport.map.name>=0&&excelImport.map.address>=0){try{excelImport.preview=DeliveryImport.build(rows,header,excelImport.map,excelImport.area);excelImport.message='読み込みました。内容を確認し、下の「確認した内容を暗号化して登録」を押してください。';}catch(e){excelImport.message=e.message;}}
+      else excelImport.message='顧客名・住所のある明細シートを選んでください。';render();
     };
     worker.onerror=()=>{if(token!==excelEpoch)return;clearTimeout(excelImport.timer);excelImport.message='Excelの読み込みに失敗しました。ファイルを確認してください。';excelMessage(excelImport.message);};
     worker.postMessage({buffer},[buffer]);
@@ -69,12 +73,9 @@ function wireExcelImport(){
   fileInput?.addEventListener('change',readExcelFile);
   fileInput?.addEventListener('cancel',()=>{clearExcelPicker();if(vaultUnlocked&&currentScreen==='settings')render();});
   document.getElementById('excelResume')?.addEventListener('click',resumeExcelPicker);
-  document.getElementById('excelSheet')?.addEventListener('change',event=>{
-    const index=Number(event.target.value);excelImport.preview=null;excelImport.rows=null;excelImport.message='シートを読み込み中です…';render();
-    clearTimeout(excelImport.timer);const token=excelEpoch;
-    excelImport.timer=setTimeout(()=>{if(token===excelEpoch){excelImport.worker.terminate();excelMessage('シートの読み込みが時間内に終わりませんでした。ファイルを選び直してください。');}},20000);
-    excelImport.worker.postMessage({index});
-  });
+  document.getElementById('excelSheet')?.addEventListener('change',event=>excelChangeSheet(Number(event.target.value)));
+  document.getElementById('excelRecommended')?.addEventListener('click',()=>excelChangeSheet(excelImport.recommendedIndex));
+  document.getElementById('excelChooseSaved')?.addEventListener('click',()=>routeOpenPlanner('','',excelSavedCustomerIds()));
   document.getElementById('excelHeader')?.addEventListener('change',event=>{
     const header=Number(event.target.value)-1;if(!Number.isInteger(header)||header<0||header>=excelImport.rows.length){excelMessage('見出し行の番号を確認してください。');return;}
     excelImport.header=header;excelImport.map=DeliveryImport.mapping(excelImport.rows[header]||[]);excelImport.preview=null;render();
