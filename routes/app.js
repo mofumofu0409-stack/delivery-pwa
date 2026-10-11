@@ -100,7 +100,7 @@ function render(){
   if (currentScreen === 'delivery') main.innerHTML = renderDelivery();
   if (currentScreen === 'check') main.innerHTML = renderCheck();
   if (currentScreen === 'customer') main.innerHTML = renderCustomerForm();
-  if (currentScreen === 'settings') main.innerHTML = renderExcelImport()+renderCalendarSettings()+renderRouteSettings();
+  if (currentScreen === 'settings') main.innerHTML = '<p class="small">アプリ v0.10.1（表示修正版）</p>'+renderExcelImport()+renderCalendarSettings()+renderRouteSettings();
   document.getElementById('vaultPanel').hidden = currentScreen !== 'settings';
   wireEvents();
 }
@@ -330,7 +330,7 @@ function renderRouteSettings(){
       <h3>5. 訪問順を決める</h3>
       <p>選んだ顧客の番号を変更するか、地図で訪問順を決めてください。</p>
       <p id="routeOrderEmpty" ${state.customers.some(c=>draft?draft.order.includes(c.id):c.schedule?.routeId===route?.id&&!!route)?'hidden':''}>顧客を選ぶと、ここに表示されます。</p>
-      ${state.customers.map((c,i)=>{const member=draft?draft.order.includes(c.id):!!route&&c.schedule?.routeId===route.id;return `<div class="route-customer" data-route-order-row="${escapeHtml(c.id)}" ${member?'':'hidden'}><label>${escapeHtml(c.name)}<input type="number" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${draft&&member?draft.order.indexOf(c.id)+1:member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順"></label></div>`;}).join('')}
+      ${state.customers.map((c,i)=>{const member=draft?draft.order.includes(c.id):!!route&&c.schedule?.routeId===route.id;return `<div class="route-customer" data-route-order-row="${escapeHtml(c.id)}" ${member?'':'hidden'}><label for="route-order-${i}">${escapeHtml(c.name)}<small>${escapeHtml(c.address)}</small></label><input id="route-order-${i}" type="number" inputmode="numeric" data-route-order="${escapeHtml(c.id)}" min="1" max="5000" step="1" value="${draft&&member?draft.order.indexOf(c.id)+1:member?c.schedule.order:i+1}" aria-label="${escapeHtml(c.name)}の配達順"></div>`;}).join('')}
       <button type="button" id="routeOpenMap">地図で訪問順を決める</button>
       <p class="small">地図は必要な場合だけ使えます。最後に下のボタンで登録してください。</p>
       <h3>6. 登録する</h3>

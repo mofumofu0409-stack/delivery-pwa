@@ -36,3 +36,10 @@
 .excel-error {white-space:pre-wrap;color:#9a3412;overflow-wrap:anywhere;}
 .excel-item-meta {display:block;color:#64748b;font-size:0.8rem;font-weight:400;}
 @media(max-width:440px){.excel-columns{grid-template-columns:1fr;}}
+
+/* Selection rows and order rows have different column structures. */
+.route-customer{grid-template-columns:24px minmax(0,1fr)}
+.route-customer[data-route-order-row]{grid-template-columns:minmax(0,1fr) 80px}
+.route-customer[hidden]{display:none}
+.route-customer label{min-width:0;overflow-wrap:anywhere;line-height:1.5}
+.route-customer[data-route-order-row] input{min-height:48px;text-align:center;font-size:18px}
