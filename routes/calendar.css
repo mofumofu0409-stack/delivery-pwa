@@ -65,3 +65,7 @@
 .contract-fields button,.cash-panel button {min-height:48px;font-size:18px;}
 .contract-fields [data-contract-item] {margin-bottom:14px;border:1px solid #ccd8dc;border-radius:10px;}
 .cash-button-amount {display:block;white-space:nowrap;font-size:16px;}
+
+.excel-file-picker{display:block!important;position:relative;background:#0f766e;color:white;border-radius:12px;padding:16px!important;text-align:center;font-size:20px;font-weight:700;cursor:pointer}.excel-file-picker input[type=file]{position:absolute;inset:0;width:100%;height:100%;margin:0!important;opacity:0;cursor:pointer}.excel-file-picker:focus-within{outline:3px solid #334155;outline-offset:3px}.excel-file-status{background:#edf8f6;border:2px solid #0f766e;border-radius:12px;padding:16px;margin:12px 0}.excel-file-status h3{margin:0 0 10px}.excel-file-name{overflow-wrap:anywhere;font-weight:700}.excel-read-count{font-size:24px;font-weight:700}.excel-stage{display:inline-block;padding:6px 12px;border-radius:8px;background:#fff1cf;color:#614600}.excel-settings .excel-preview{max-height:340px;overflow-y:auto;overscroll-behavior:contain;border:1px solid #ccd8dc;border-radius:10px;padding:10px}.excel-settings #excelCommit,.excel-settings #excelViewImported{display:block;width:100%;min-height:54px;font-size:20px;margin:14px 0}.excel-advanced{margin:18px 0}
+
+#excelChooseSaved:disabled{background:#e3e8eb;color:#5a6770;border-color:#c9d1d6;cursor:default}
